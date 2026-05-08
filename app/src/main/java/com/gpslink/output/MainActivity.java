@@ -14,6 +14,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -40,9 +41,8 @@ public class MainActivity extends AppCompatActivity {
     private GpsBluetoothService service;
     private boolean bound = false;
     private boolean running = false;
+    private PowerManager.WakeLock wakeLock;
 
-    private final List<BluetoothDevice> deviceList = new ArrayList<>();
-    private ArrayAdapter<String> deviceAdapter;
     private BluetoothAdapter btAdapter;
 
     private final ServiceConnection conn = new ServiceConnection() {
@@ -124,13 +124,20 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-        if (Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(serviceStopReceiver,
-                    new IntentFilter(GpsBluetoothService.ACTION_STOPPED),
-                    2); 
-        } else {
-            registerReceiver(serviceStopReceiver,
-                    new IntentFilter(GpsBluetoothService.ACTION_STOPPED));
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                // Using literal 2 for Context.RECEIVER_NOT_EXPORTED
+                ContextCompat.registerReceiver(this, serviceStopReceiver,
+                        new IntentFilter(GpsBluetoothService.ACTION_STOPPED),
+                        2); 
+            } else {
+                registerReceiver(serviceStopReceiver,
+                        new IntentFilter(GpsBluetoothService.ACTION_STOPPED));
+            }
+        } catch (Exception e) {
+            try {
+                registerReceiver(serviceStopReceiver, new IntentFilter(GpsBluetoothService.ACTION_STOPPED));
+            } catch (Exception ignored) {}
         }
 
         checkPermissions();
