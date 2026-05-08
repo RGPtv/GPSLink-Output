@@ -123,9 +123,7 @@ public class MainActivity extends AppCompatActivity {
         spinnerDevices.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (bound && position < deviceList.size()) {
-                    service.setTargetDevice(deviceList.get(position));
-                }
+                // No longer needed for Server mode as we accept any connection
             }
 
             @Override
@@ -217,18 +215,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startService() {
-        if (deviceList.isEmpty()) {
-            Toast.makeText(this, "No paired Bluetooth device selected", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        int idx = spinnerDevices.getSelectedItemPosition();
-        if (idx < 0 || idx >= deviceList.size()) return;
-
-        BluetoothDevice device = deviceList.get(idx);
-        Prefs.saveLastDevice(this, device.getAddress());
-
         Intent intent = new Intent(this, GpsBluetoothService.class);
-        intent.putExtra(GpsBluetoothService.EXTRA_DEVICE_ADDRESS, device.getAddress());
         startForegroundService(intent);
 
         if (!bound) bindToService();

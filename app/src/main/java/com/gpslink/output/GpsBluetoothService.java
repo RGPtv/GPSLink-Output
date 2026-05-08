@@ -8,6 +8,7 @@ import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.content.Intent;
@@ -44,9 +45,9 @@ public class GpsBluetoothService extends Service {
 
     private LocationManager locationManager;
     private BluetoothAdapter btAdapter;
+    private BluetoothServerSocket serverSocket;
     private BluetoothSocket btSocket;
     private OutputStream btOut;
-    private BluetoothDevice targetDevice;
 
     private PowerManager.WakeLock wakeLock;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -91,16 +92,11 @@ public class GpsBluetoothService extends Service {
         }
 
         if (!running) {
-            String addr = intent != null ? intent.getStringExtra(EXTRA_DEVICE_ADDRESS) : null;
-            if (addr == null) addr = Prefs.getLastDevice(this);
-            if (addr != null && btAdapter != null) {
-                targetDevice = btAdapter.getRemoteDevice(addr);
-            }
-            startForeground(NOTIF_ID, buildNotification("Starting..."));
-            wakeLock.acquire(10 * 60 * 60 * 1000L);
+            startForeground(NOTIF_ID, buildNotification("Waiting for connection..."));
+            if (wakeLock != null) wakeLock.acquire(10 * 60 * 60 * 1000L);
             running = true;
             startGps();
-            connectBluetooth();
+            startServer();
         }
 
         return START_STICKY;
@@ -161,48 +157,39 @@ public class GpsBluetoothService extends Service {
         }
     };
 
-    private void connectBluetooth() {
-        if (connecting || targetDevice == null) return;
-        connecting = true;
-
-        notifyBtStatus("Connecting...", false);
+    private void startServer() {
+        if (btAdapter == null) return;
 
         new Thread(() -> {
-            BluetoothSocket sock = null;
             try {
-                btAdapter.cancelDiscovery();
-                sock = targetDevice.createRfcommSocketToServiceRecord(SPP_UUID);
-                sock.connect();
-                btSocket = sock;
-                btOut = sock.getOutputStream();
-                connecting = false;
-                String name = getDeviceName(targetDevice);
-                Prefs.saveLastDevice(GpsBluetoothService.this, targetDevice.getAddress());
-                handler.post(() -> {
-                    updateNotification("Connected: " + name);
-                    notifyBtStatusConnected(name);
-                });
-            } catch (Exception e) {
-                connecting = false;
-                closeSilently(sock);
-                btSocket = null;
-                btOut = null;
-                handler.postDelayed(this::connectBluetooth, RECONNECT_DELAY_MS);
-                handler.post(() -> notifyBtStatus("Reconnecting...", false));
+                serverSocket = btAdapter.listenUsingRfcommWithServiceRecord("GPSLinkServer", SPP_UUID);
+                while (running) {
+                    handler.post(() -> notifyBtStatus("Waiting for connection...", false));
+                    BluetoothSocket socket = serverSocket.accept();
+                    if (socket != null) {
+                        closeSilently(btSocket); // Close previous client if any
+                        btSocket = socket;
+                        btOut = socket.getOutputStream();
+                        String name = getDeviceName(socket.getRemoteDevice());
+                        handler.post(() -> {
+                            updateNotification("Connected: " + name);
+                            notifyBtStatusConnected(name);
+                        });
+                    }
+                }
+            } catch (IOException e) {
+                if (running) {
+                    handler.post(() -> notifyBtStatus("Server stopped", false));
+                }
             }
-        }, "BT-Connect").start();
+        }, "BT-Server").start();
     }
 
     private void handleBluetoothDisconnect() {
         closeSilently(btSocket);
         btSocket = null;
         btOut = null;
-        handler.post(() -> {
-            notifyBtStatus("Disconnected", false);
-            if (running) {
-                handler.postDelayed(this::connectBluetooth, RECONNECT_DELAY_MS);
-            }
-        });
+        handler.post(() -> notifyBtStatus("Client Disconnected", false));
     }
 
     @SuppressWarnings("MissingPermission")
@@ -218,7 +205,7 @@ public class GpsBluetoothService extends Service {
     private void notifyBtStatus(String status, boolean connected) {
         if (uiCallback != null) {
             uiCallback.onBluetoothStatus(status,
-                    targetDevice != null ? getDeviceName(targetDevice) : null,
+                    btSocket != null ? getDeviceName(btSocket.getRemoteDevice()) : null,
                     connected);
         }
     }
@@ -229,8 +216,12 @@ public class GpsBluetoothService extends Service {
         }
     }
 
-    private void closeSilently(BluetoothSocket sock) {
-        if (sock != null) try { sock.close(); } catch (IOException ignored) {}
+    private void closeSilently(Object sock) {
+        if (sock == null) return;
+        try {
+            if (sock instanceof BluetoothSocket) ((BluetoothSocket) sock).close();
+            else if (sock instanceof BluetoothServerSocket) ((BluetoothServerSocket) sock).close();
+        } catch (IOException ignored) {}
     }
 
     private void updateNotification(String text) {
@@ -280,7 +271,9 @@ public class GpsBluetoothService extends Service {
         running = false;
         stopGps();
         handler.removeCallbacksAndMessages(null);
+        closeSilently(serverSocket);
         closeSilently(btSocket);
+        serverSocket = null;
         btSocket = null;
         btOut = null;
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
