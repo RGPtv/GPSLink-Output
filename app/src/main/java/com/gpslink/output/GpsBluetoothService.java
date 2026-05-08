@@ -120,10 +120,24 @@ public class GpsBluetoothService extends Service {
 
     @SuppressWarnings("MissingPermission")
     private void startGps() {
-        locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER, 500, 0f, locationListener);
-        locationManager.registerGnssStatusCallback(gnssStatusCallback, handler);
-        locationManager.addNmeaListener(nmeaListener, handler);
+        try {
+            locationManager.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER, 500, 0f, locationListener);
+        } catch (Exception e) {
+            notifyBtStatus("GPS Provider Error", false);
+        }
+
+        try {
+            locationManager.registerGnssStatusCallback(gnssStatusCallback, handler);
+        } catch (Exception e) {
+            // Some low-end devices don't support GNSS status
+        }
+
+        try {
+            locationManager.addNmeaListener(nmeaListener, handler);
+        } catch (Exception e) {
+            notifyBtStatus("NMEA Listener Error", false);
+        }
     }
 
     private void stopGps() {
@@ -300,9 +314,9 @@ public class GpsBluetoothService extends Service {
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("GPSLink Output")
                 .setContentText(text)
-                .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                .setSmallIcon(android.R.drawable.stat_notify_sync)
                 .setContentIntent(contentIntent)
-                .addAction(android.R.drawable.ic_media_pause, "Stop", stopPi)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stopPi)
                 .setOngoing(true)
                 .build();
     }
