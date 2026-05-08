@@ -256,10 +256,6 @@ public class GpsBluetoothService extends Service {
         ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(ch);
     }
 
-    public void setTargetDevice(BluetoothDevice device) {
-        targetDevice = device;
-    }
-
     public void setUiCallback(UiCallback cb) {
         uiCallback = cb;
     }
