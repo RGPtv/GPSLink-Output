@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="20dp">
 
         <!-- Header -->
         <TextView
@@ -17,63 +17,68 @@
             android:layout_height="wrap_content"
             android:text="GPSLink Output"
             android:textColor="@color/accent"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:paddingBottom="16dp" />
+            android:textSize="24sp"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.05"
+            android:paddingBottom="24dp" />
 
         <!-- GPS Status Card -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@color/surface"
-            android:padding="12dp"
-            android:layout_marginBottom="8dp">
+            android:background="@drawable/card_bg"
+            android:padding="20dp"
+            android:elevation="4dp"
+            android:layout_marginBottom="16dp">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="GPS"
+                android:text="GPS SENSOR"
                 android:textColor="@color/text_secondary"
-                android:textSize="11sp"
-                android:layout_marginBottom="6dp" />
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="12dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="4dp">
+                android:layout_marginBottom="8dp">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Fix"
+                    android:text="Fix Status"
                     android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/tvFix"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="No Fix"
+                    android:text="NO FIX"
                     android:textColor="@color/red"
-                    android:textSize="13sp" />
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="4dp">
+                android:layout_marginBottom="8dp">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Satellites (used/view)"
+                    android:text="Satellites"
                     android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/tvSats"
@@ -81,153 +86,97 @@
                     android:layout_height="wrap_content"
                     android:text="0 / 0"
                     android:textColor="@color/text_primary"
-                    android:textSize="13sp" />
+                    android:textSize="14sp" />
             </LinearLayout>
 
-            <LinearLayout
+            <View android:layout_width="match_parent" android:layout_height="1dp" 
+                android:background="#33FFFFFF" android:layout_marginVertical="12dp" />
+
+            <GridLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="4dp">
+                android:columnCount="2"
+                android:alignmentMode="alignMargins">
 
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Latitude"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                <LinearLayout android:orientation="vertical" android:layout_columnWeight="1">
+                    <TextView android:text="LATITUDE" android:textColor="@color/text_secondary" android:textSize="11sp" />
+                    <TextView android:id="@+id/tvLat" android:text="—" android:textColor="@color/text_primary" android:textSize="16sp" />
+                </LinearLayout>
 
-                <TextView
-                    android:id="@+id/tvLat"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="—"
-                    android:textColor="@color/text_primary"
-                    android:textSize="13sp" />
-            </LinearLayout>
+                <LinearLayout android:orientation="vertical" android:layout_columnWeight="1">
+                    <TextView android:text="LONGITUDE" android:textColor="@color/text_secondary" android:textSize="11sp" />
+                    <TextView android:id="@+id/tvLon" android:text="—" android:textColor="@color/text_primary" android:textSize="16sp" />
+                </LinearLayout>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="4dp">
+                <LinearLayout android:orientation="vertical" android:layout_columnWeight="1" android:layout_marginTop="12dp">
+                    <TextView android:text="ALTITUDE" android:textColor="@color/text_secondary" android:textSize="11sp" />
+                    <TextView android:id="@+id/tvAlt" android:text="—" android:textColor="@color/text_primary" android:textSize="16sp" />
+                </LinearLayout>
 
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Longitude"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
-
-                <TextView
-                    android:id="@+id/tvLon"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="—"
-                    android:textColor="@color/text_primary"
-                    android:textSize="13sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="4dp">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Altitude (m)"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
-
-                <TextView
-                    android:id="@+id/tvAlt"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="—"
-                    android:textColor="@color/text_primary"
-                    android:textSize="13sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Speed (km/h)"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
-
-                <TextView
-                    android:id="@+id/tvSpeed"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="—"
-                    android:textColor="@color/text_primary"
-                    android:textSize="13sp" />
-            </LinearLayout>
+                <LinearLayout android:orientation="vertical" android:layout_columnWeight="1" android:layout_marginTop="12dp">
+                    <TextView android:text="SPEED (KM/H)" android:textColor="@color/text_secondary" android:textSize="11sp" />
+                    <TextView android:id="@+id/tvSpeed" android:text="—" android:textColor="@color/text_primary" android:textSize="16sp" />
+                </LinearLayout>
+            </GridLayout>
         </LinearLayout>
 
-        <!-- Bluetooth Status Card -->
+        <!-- Bluetooth Output Card -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@color/surface"
-            android:padding="12dp"
-            android:layout_marginBottom="8dp">
+            android:background="@drawable/card_bg"
+            android:padding="20dp"
+            android:elevation="4dp"
+            android:layout_marginBottom="24dp">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="BLUETOOTH"
+                android:text="BLUETOOTH SERVER"
                 android:textColor="@color/text_secondary"
-                android:textSize="11sp"
-                android:layout_marginBottom="6dp" />
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="12dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="4dp">
+                android:layout_marginBottom="8dp">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Status"
+                    android:text="Connection Status"
                     android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/tvBtStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Disconnected"
+                    android:text="STOPPED"
                     android:textColor="@color/red"
-                    android:textSize="13sp" />
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Device"
+                    android:text="Client Device"
                     android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/tvBtDevice"
@@ -235,46 +184,44 @@
                     android:layout_height="wrap_content"
                     android:text="None"
                     android:textColor="@color/text_primary"
-                    android:textSize="13sp" />
+                    android:textSize="14sp" />
             </LinearLayout>
-        </LinearLayout>
 
-        <!-- Device Selector -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@color/surface"
-            android:padding="12dp"
-            android:layout_marginBottom="8dp">
-
-            <TextView
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="PAIRED DEVICE"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp"
-                android:layout_marginBottom="6dp" />
+                android:orientation="horizontal">
 
-            <Spinner
-                android:id="@+id/spinnerDevices"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:background="@color/bg"
-                android:popupBackground="@color/surface" />
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Sent NMEA Sentences"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/tvSentCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- Controls -->
         <Button
             android:id="@+id/btnToggle"
             android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:text="START"
+            android:layout_height="56dp"
+            android:text="START SERVER"
             android:textColor="@color/bg"
-            android:textSize="15sp"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:backgroundTint="@color/green"
-            android:layout_marginBottom="8dp" />
+            android:elevation="6dp" />
 
     </LinearLayout>
 </ScrollView>

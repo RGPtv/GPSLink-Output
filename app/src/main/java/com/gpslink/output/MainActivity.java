@@ -33,9 +33,8 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int REQ_PERMISSIONS = 1;
 
-    private TextView tvFix, tvSats, tvLat, tvLon, tvAlt, tvSpeed, tvBtStatus, tvBtDevice;
+    private TextView tvFix, tvSats, tvLat, tvLon, tvAlt, tvSpeed, tvBtStatus, tvBtDevice, tvSentCount;
     private Button btnToggle;
-    private Spinner spinnerDevices;
 
     private GpsBluetoothService service;
     private boolean bound = false;
@@ -65,9 +64,9 @@ public class MainActivity extends AppCompatActivity {
     private final GpsBluetoothService.UiCallback uiCallback = new GpsBluetoothService.UiCallback() {
         @Override
         public void onGpsUpdate(boolean hasFix, int satsUsed, int satsInView,
-                                double lat, double lon, double alt, float speed) {
+                                 double lat, double lon, double alt, float speed) {
             runOnUiThread(() -> {
-                tvFix.setText(hasFix ? "Fix" : "No Fix");
+                tvFix.setText(hasFix ? "FIX" : "NO FIX");
                 tvFix.setTextColor(getColor(hasFix ? R.color.green : R.color.red));
                 tvSats.setText(satsUsed + " / " + satsInView);
                 if (hasFix) {
@@ -80,11 +79,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        public void onBluetoothStatus(String status, String deviceName, boolean connected) {
+        public void onBluetoothStatus(String status, String deviceName, boolean connected, long dataSent) {
             runOnUiThread(() -> {
-                tvBtStatus.setText(status);
-                tvBtStatus.setTextColor(getColor(connected ? R.color.green : R.color.red));
+                tvBtStatus.setText(status.toUpperCase());
+                tvBtStatus.setTextColor(getColor(connected ? R.color.accent : R.color.red));
                 tvBtDevice.setText(deviceName != null ? deviceName : "None");
+                tvSentCount.setText(String.valueOf(dataSent));
             });
         }
     };
@@ -110,25 +110,11 @@ public class MainActivity extends AppCompatActivity {
         tvSpeed = findViewById(R.id.tvSpeed);
         tvBtStatus = findViewById(R.id.tvBtStatus);
         tvBtDevice = findViewById(R.id.tvBtDevice);
+        tvSentCount = findViewById(R.id.tvSentCount);
         btnToggle = findViewById(R.id.btnToggle);
-        spinnerDevices = findViewById(R.id.spinnerDevices);
 
         BluetoothManager bm = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
         btAdapter = bm != null ? bm.getAdapter() : null;
-
-        deviceAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, new ArrayList<>());
-        deviceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerDevices.setAdapter(deviceAdapter);
-
-        spinnerDevices.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                // No longer needed for Server mode as we accept any connection
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
-        });
 
         btnToggle.setOnClickListener(v -> {
             if (!running) startService();
@@ -180,33 +166,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void onPermissionsGranted() {
-        populateDevices();
         bindToService();
-    }
-
-    @SuppressWarnings("MissingPermission")
-    private void populateDevices() {
-        if (btAdapter == null) return;
-        Set<BluetoothDevice> paired = btAdapter.getBondedDevices();
-        deviceList.clear();
-        deviceAdapter.clear();
-        if (paired != null) {
-            for (BluetoothDevice d : paired) {
-                deviceList.add(d);
-                deviceAdapter.add(d.getName() != null ? d.getName() : d.getAddress());
-            }
-        }
-        deviceAdapter.notifyDataSetChanged();
-
-        String lastAddr = Prefs.getLastDevice(this);
-        if (lastAddr != null) {
-            for (int i = 0; i < deviceList.size(); i++) {
-                if (deviceList.get(i).getAddress().equals(lastAddr)) {
-                    spinnerDevices.setSelection(i);
-                    break;
-                }
-            }
-        }
     }
 
     private void bindToService() {
@@ -232,7 +192,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateToggleButton() {
-        btnToggle.setText(running ? "STOP" : "START");
+        btnToggle.setText(running ? "STOP SERVER" : "START SERVER");
         btnToggle.setBackgroundTintList(getColorStateList(running ? R.color.red : R.color.green));
     }
 
