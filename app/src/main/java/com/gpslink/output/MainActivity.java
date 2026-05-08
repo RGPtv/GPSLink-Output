@@ -121,9 +121,14 @@ public class MainActivity extends AppCompatActivity {
             else stopServiceAction();
         });
 
-        registerReceiver(serviceStopReceiver,
-                new IntentFilter(GpsBluetoothService.ACTION_STOPPED),
-                RECEIVER_NOT_EXPORTED);
+        if (Build.VERSION.SDK_INT >= 33) { // Build.VERSION_CODES.TIRAMISU
+            registerReceiver(serviceStopReceiver,
+                    new IntentFilter(GpsBluetoothService.ACTION_STOPPED),
+                    Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(serviceStopReceiver,
+                    new IntentFilter(GpsBluetoothService.ACTION_STOPPED));
+        }
 
         checkPermissions();
     }

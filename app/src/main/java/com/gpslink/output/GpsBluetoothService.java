@@ -100,7 +100,12 @@ public class GpsBluetoothService extends Service {
         }
 
         if (running.compareAndSet(false, true)) {
-            startForeground(NOTIF_ID, buildNotification("Waiting for connection..."));
+            Notification notif = buildNotification("Waiting for connection...");
+            if (Build.VERSION.SDK_INT >= 34) { // Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+                startForeground(NOTIF_ID, notif, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+            } else {
+                startForeground(NOTIF_ID, notif);
+            }
             if (wakeLock != null && !wakeLock.isHeld()) wakeLock.acquire(10 * 60 * 60 * 1000L);
             dataSentCount.set(0);
             startGps();
