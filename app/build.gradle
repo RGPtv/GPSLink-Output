@@ -28,4 +28,14 @@ android {
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.0'
+
+    // Align Kotlin dependencies to fix duplicate class errors
+    constraints {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22") {
+            because("kotlin-stdlib 1.8.22 already includes these classes")
+        }
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22") {
+            because("kotlin-stdlib 1.8.22 already includes these classes")
+        }
+    }
 }
