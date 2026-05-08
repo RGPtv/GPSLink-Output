@@ -14,7 +14,6 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.os.PowerManager;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -25,25 +24,23 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final int REQ_PERMISSIONS = 1;
 
-    private TextView tvFix, tvSats, tvLat, tvLon, tvAlt, tvSpeed, tvBtStatus, tvBtDevice, tvSentCount;
+    private TextView tvFix, tvSats, tvLat, tvLon, tvAlt, tvSpeed, tvBtStatus, tvBtDevice, tvLog;
     private Button btnToggle;
 
     private GpsBluetoothService service;
     private boolean bound = false;
     private boolean running = false;
-    private PowerManager.WakeLock wakeLock;
 
-    private BluetoothAdapter btAdapter;
+    private final List<String> nmeaLogs = new ArrayList<>();
+    private static final int MAX_LOGS = 20;
 
     private final ServiceConnection conn = new ServiceConnection() {
         @Override
@@ -65,10 +62,10 @@ public class MainActivity extends AppCompatActivity {
     private final GpsBluetoothService.UiCallback uiCallback = new GpsBluetoothService.UiCallback() {
         @Override
         public void onGpsUpdate(boolean hasFix, int satsUsed, int satsInView,
-                                 double lat, double lon, double alt, float speed) {
+                                double lat, double lon, double alt, float speed) {
             runOnUiThread(() -> {
-                tvFix.setText(hasFix ? "FIX" : "NO FIX");
-                tvFix.setTextColor(ContextCompat.getColor(MainActivity.this, hasFix ? R.color.green : R.color.red));
+                tvFix.setText(hasFix ? "Fix" : "No Fix");
+                tvFix.setTextColor(getColor(hasFix ? R.color.green : R.color.red));
                 tvSats.setText(satsUsed + " / " + satsInView);
                 if (hasFix) {
                     tvLat.setText(String.format("%.6f", lat));
@@ -80,12 +77,25 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        public void onBluetoothStatus(String status, String deviceName, boolean connected, long dataSent) {
+        public void onBluetoothStatus(String status, String deviceName, boolean connected) {
             runOnUiThread(() -> {
                 tvBtStatus.setText(status.toUpperCase());
-                tvBtStatus.setTextColor(ContextCompat.getColor(MainActivity.this, connected ? R.color.accent : R.color.red));
+                tvBtStatus.setTextColor(getColor(connected ? R.color.accent : R.color.text_secondary));
                 tvBtDevice.setText(deviceName != null ? deviceName : "None");
-                tvSentCount.setText(String.valueOf(dataSent));
+            });
+        }
+
+        @Override
+        public void onNmeaLog(String message) {
+            runOnUiThread(() -> {
+                nmeaLogs.add(message.trim());
+                if (nmeaLogs.size() > MAX_LOGS) nmeaLogs.remove(0);
+                
+                StringBuilder sb = new StringBuilder();
+                for (String line : nmeaLogs) {
+                    sb.append(line).append("\n");
+                }
+                tvLog.setText(sb.toString());
             });
         }
     };
@@ -103,45 +113,27 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        try {
-            tvFix = findViewById(R.id.tvFix);
-            tvSats = findViewById(R.id.tvSats);
-            tvLat = findViewById(R.id.tvLat);
-            tvLon = findViewById(R.id.tvLon);
-            tvAlt = findViewById(R.id.tvAlt);
-            tvSpeed = findViewById(R.id.tvSpeed);
-            tvBtStatus = findViewById(R.id.tvBtStatus);
-            tvBtDevice = findViewById(R.id.tvBtDevice);
-            tvSentCount = findViewById(R.id.tvSentCount);
-            btnToggle = findViewById(R.id.btnToggle);
+        tvFix = findViewById(R.id.tvFix);
+        tvSats = findViewById(R.id.tvSats);
+        tvLat = findViewById(R.id.tvLat);
+        tvLon = findViewById(R.id.tvLon);
+        tvAlt = findViewById(R.id.tvAlt);
+        tvSpeed = findViewById(R.id.tvSpeed);
+        tvBtStatus = findViewById(R.id.tvBtStatus);
+        tvBtDevice = findViewById(R.id.tvBtDevice);
+        tvLog = findViewById(R.id.tvLog);
+        btnToggle = findViewById(R.id.btnToggle);
 
-            BluetoothManager bm = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
-            btAdapter = bm != null ? bm.getAdapter() : null;
+        btnToggle.setOnClickListener(v -> {
+            if (!running) startService();
+            else stopServiceAction();
+        });
 
-            if (btnToggle != null) {
-                btnToggle.setOnClickListener(v -> {
-                    if (!running) startService();
-                    else stopServiceAction();
-                });
-            }
+        registerReceiver(serviceStopReceiver,
+                new IntentFilter(GpsBluetoothService.ACTION_STOPPED),
+                RECEIVER_NOT_EXPORTED);
 
-            // Ultra-safe receiver registration
-            IntentFilter filter = new IntentFilter(GpsBluetoothService.ACTION_STOPPED);
-            if (Build.VERSION.SDK_INT >= 33) {
-                try {
-                    // Use literal 2 for RECEIVER_NOT_EXPORTED
-                    registerReceiver(serviceStopReceiver, filter, 2);
-                } catch (Exception e) {
-                    registerReceiver(serviceStopReceiver, filter);
-                }
-            } else {
-                registerReceiver(serviceStopReceiver, filter);
-            }
-
-            checkPermissions();
-        } catch (Exception e) {
-            Toast.makeText(this, "Init Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
+        checkPermissions();
     }
 
     private void checkPermissions() {
@@ -208,8 +200,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateToggleButton() {
-        btnToggle.setText(running ? "STOP SERVER" : "START SERVER");
-        btnToggle.setBackgroundTintList(ContextCompat.getColorStateList(this, running ? R.color.red : R.color.green));
+        btnToggle.setText(running ? "SHUTDOWN SERVER" : "INITIALIZE SERVER");
+        btnToggle.setBackgroundTintList(getColorStateList(running ? R.color.red : R.color.green));
     }
 
     @Override
