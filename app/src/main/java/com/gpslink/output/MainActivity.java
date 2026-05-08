@@ -103,44 +103,45 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        tvFix = findViewById(R.id.tvFix);
-        tvSats = findViewById(R.id.tvSats);
-        tvLat = findViewById(R.id.tvLat);
-        tvLon = findViewById(R.id.tvLon);
-        tvAlt = findViewById(R.id.tvAlt);
-        tvSpeed = findViewById(R.id.tvSpeed);
-        tvBtStatus = findViewById(R.id.tvBtStatus);
-        tvBtDevice = findViewById(R.id.tvBtDevice);
-        tvSentCount = findViewById(R.id.tvSentCount);
-        btnToggle = findViewById(R.id.btnToggle);
-
-        BluetoothManager bm = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
-        btAdapter = bm != null ? bm.getAdapter() : null;
-
-        if (btnToggle != null) {
-            btnToggle.setOnClickListener(v -> {
-                if (!running) startService();
-                else stopServiceAction();
-            });
-        }
-
         try {
-            if (Build.VERSION.SDK_INT >= 33) {
-                // Using literal 2 for Context.RECEIVER_NOT_EXPORTED
-                ContextCompat.registerReceiver(this, serviceStopReceiver,
-                        new IntentFilter(GpsBluetoothService.ACTION_STOPPED),
-                        2); 
-            } else {
-                registerReceiver(serviceStopReceiver,
-                        new IntentFilter(GpsBluetoothService.ACTION_STOPPED));
-            }
-        } catch (Exception e) {
-            try {
-                registerReceiver(serviceStopReceiver, new IntentFilter(GpsBluetoothService.ACTION_STOPPED));
-            } catch (Exception ignored) {}
-        }
+            tvFix = findViewById(R.id.tvFix);
+            tvSats = findViewById(R.id.tvSats);
+            tvLat = findViewById(R.id.tvLat);
+            tvLon = findViewById(R.id.tvLon);
+            tvAlt = findViewById(R.id.tvAlt);
+            tvSpeed = findViewById(R.id.tvSpeed);
+            tvBtStatus = findViewById(R.id.tvBtStatus);
+            tvBtDevice = findViewById(R.id.tvBtDevice);
+            tvSentCount = findViewById(R.id.tvSentCount);
+            btnToggle = findViewById(R.id.btnToggle);
 
-        checkPermissions();
+            BluetoothManager bm = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
+            btAdapter = bm != null ? bm.getAdapter() : null;
+
+            if (btnToggle != null) {
+                btnToggle.setOnClickListener(v -> {
+                    if (!running) startService();
+                    else stopServiceAction();
+                });
+            }
+
+            // Ultra-safe receiver registration
+            IntentFilter filter = new IntentFilter(GpsBluetoothService.ACTION_STOPPED);
+            if (Build.VERSION.SDK_INT >= 33) {
+                try {
+                    // Use literal 2 for RECEIVER_NOT_EXPORTED
+                    registerReceiver(serviceStopReceiver, filter, 2);
+                } catch (Exception e) {
+                    registerReceiver(serviceStopReceiver, filter);
+                }
+            } else {
+                registerReceiver(serviceStopReceiver, filter);
+            }
+
+            checkPermissions();
+        } catch (Exception e) {
+            Toast.makeText(this, "Init Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     private void checkPermissions() {
