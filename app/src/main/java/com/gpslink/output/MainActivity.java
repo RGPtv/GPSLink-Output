@@ -24,6 +24,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -67,7 +68,7 @@ public class MainActivity extends AppCompatActivity {
                                  double lat, double lon, double alt, float speed) {
             runOnUiThread(() -> {
                 tvFix.setText(hasFix ? "FIX" : "NO FIX");
-                tvFix.setTextColor(getColor(hasFix ? R.color.green : R.color.red));
+                tvFix.setTextColor(ContextCompat.getColor(MainActivity.this, hasFix ? R.color.green : R.color.red));
                 tvSats.setText(satsUsed + " / " + satsInView);
                 if (hasFix) {
                     tvLat.setText(String.format("%.6f", lat));
@@ -82,7 +83,7 @@ public class MainActivity extends AppCompatActivity {
         public void onBluetoothStatus(String status, String deviceName, boolean connected, long dataSent) {
             runOnUiThread(() -> {
                 tvBtStatus.setText(status.toUpperCase());
-                tvBtStatus.setTextColor(getColor(connected ? R.color.accent : R.color.red));
+                tvBtStatus.setTextColor(ContextCompat.getColor(MainActivity.this, connected ? R.color.accent : R.color.red));
                 tvBtDevice.setText(deviceName != null ? deviceName : "None");
                 tvSentCount.setText(String.valueOf(dataSent));
             });
@@ -116,15 +117,17 @@ public class MainActivity extends AppCompatActivity {
         BluetoothManager bm = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
         btAdapter = bm != null ? bm.getAdapter() : null;
 
-        btnToggle.setOnClickListener(v -> {
-            if (!running) startService();
-            else stopServiceAction();
-        });
+        if (btnToggle != null) {
+            btnToggle.setOnClickListener(v -> {
+                if (!running) startService();
+                else stopServiceAction();
+            });
+        }
 
-        if (Build.VERSION.SDK_INT >= 33) { // Build.VERSION_CODES.TIRAMISU
+        if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(serviceStopReceiver,
                     new IntentFilter(GpsBluetoothService.ACTION_STOPPED),
-                    Context.RECEIVER_NOT_EXPORTED);
+                    2); 
         } else {
             registerReceiver(serviceStopReceiver,
                     new IntentFilter(GpsBluetoothService.ACTION_STOPPED));
@@ -198,7 +201,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateToggleButton() {
         btnToggle.setText(running ? "STOP SERVER" : "START SERVER");
-        btnToggle.setBackgroundTintList(getColorStateList(running ? R.color.red : R.color.green));
+        btnToggle.setBackgroundTintList(ContextCompat.getColorStateList(this, running ? R.color.red : R.color.green));
     }
 
     @Override

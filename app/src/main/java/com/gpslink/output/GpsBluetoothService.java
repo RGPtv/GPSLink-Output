@@ -102,8 +102,9 @@ public class GpsBluetoothService extends Service {
 
         if (running.compareAndSet(false, true)) {
             Notification notif = buildNotification("Waiting for connection...");
-            if (Build.VERSION.SDK_INT >= 34) { // Build.VERSION_CODES.UPSIDE_DOWN_CAKE
-                startForeground(NOTIF_ID, notif, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+            if (Build.VERSION.SDK_INT >= 34) {
+                // Using literal 8 for ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                startForeground(NOTIF_ID, notif, 8);
             } else {
                 startForeground(NOTIF_ID, notif);
             }
