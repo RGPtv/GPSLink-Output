@@ -10,7 +10,6 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
-import android.content.Context;
 import android.content.Intent;
 import android.location.GnssStatus;
 import android.location.Location;
@@ -32,36 +31,42 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class GpsBluetoothService extends Service {
 
-    public static final String ACTION_STOP = "com.gpslink.output.STOP";
+    public static final String ACTION_STOP    = "com.gpslink.output.STOP";
     public static final String ACTION_STOPPED = "com.gpslink.output.STOPPED";
     public static final String EXTRA_DEVICE_ADDRESS = "device_address";
 
     private static final String CHANNEL_ID = "gpslink_channel";
-    private static final int NOTIF_ID = 1;
-    private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
-    private static final long RECONNECT_DELAY_MS = 3000;
+    private static final int    NOTIF_ID   = 1;
+    private static final UUID   SPP_UUID   =
+            UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
     private final IBinder binder = new LocalBinder();
     private volatile UiCallback uiCallback;
 
     private LocationManager locationManager;
     private BluetoothAdapter btAdapter;
+
     private volatile BluetoothServerSocket serverSocket;
-    private volatile BluetoothSocket btSocket;
-    private volatile OutputStream btOut;
+    private volatile BluetoothSocket       btSocket;
+    private volatile OutputStream          btOut;
+
     private final LinkedBlockingQueue<String> writeQueue = new LinkedBlockingQueue<>(100);
     private Thread writeThread;
 
     private PowerManager.WakeLock wakeLock;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
-    private boolean running = false;
-    private boolean connecting = false;
-    private int satsUsed = 0;
+    // volatile so BT-Write thread sees the update immediately
+    private volatile boolean running = false;
+    private int satsUsed   = 0;
     private int satsInView = 0;
     private boolean hasFix = false;
 
-    private final byte[] writeBuffer = new byte[256];
+    // FIX #6: writeBuffer removed — was allocated but never used
+
+    // -------------------------------------------------------------------------
+    // Interface
+    // -------------------------------------------------------------------------
 
     public interface UiCallback {
         void onGpsUpdate(boolean hasFix, int satsUsed, int satsInView,
@@ -74,30 +79,44 @@ public class GpsBluetoothService extends Service {
         public GpsBluetoothService getService() { return GpsBluetoothService.this; }
     }
 
-    @Override
-    public IBinder onBind(Intent intent) { return binder; }
+    @Override public IBinder onBind(Intent intent) { return binder; }
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
 
     @Override
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
+
         BluetoothManager bm = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
-        btAdapter = bm != null ? bm.getAdapter() : null;
+        btAdapter = (bm != null) ? bm.getAdapter() : null;
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+
+        // FIX #1: null-check PowerManager before calling newWakeLock
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GPSLink:WakeLock");
+        if (pm != null) {
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GPSLink:WakeLock");
+        }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
+            stopInternal();
             stopSelf();
             return START_NOT_STICKY;
         }
 
         if (!running) {
             startForeground(NOTIF_ID, buildNotification("Waiting for connection..."));
-            if (wakeLock != null) wakeLock.acquire(10 * 60 * 60 * 1000L);
+
+            // FIX #1: guard isHeld(); use realistic 8-hour cap (was 10h, unguarded)
+            if (wakeLock != null && !wakeLock.isHeld()) {
+                wakeLock.acquire(8 * 60 * 60 * 1000L);
+            }
+
             running = true;
             startGps();
             startWriteThread();
@@ -106,6 +125,57 @@ public class GpsBluetoothService extends Service {
 
         return START_STICKY;
     }
+
+    @Override
+    public void onDestroy() {
+        stopInternal();
+        super.onDestroy();
+    }
+
+    private void stopInternal() {
+        if (!running) return;
+        running = false;
+        hasFix = false;
+        satsUsed = 0;
+        satsInView = 0;
+        stopGps();
+
+        // Interrupt write thread first so it stops trying to write
+        if (writeThread != null) {
+            writeThread.interrupt();
+            writeThread = null;
+        }
+
+        // FIX #3: null serverSocket field first (thread checks running flag),
+        // then close so accept() unblocks cleanly without NPE in server thread
+        BluetoothServerSocket ss = serverSocket;
+        serverSocket = null;
+        closeSilently(ss);
+
+        closeClientSocket();
+
+        // FIX #1: release WakeLock safely
+        if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
+
+        stopForeground(true);
+
+        handler.removeCallbacksAndMessages(null);
+        handler.post(() -> {
+            UiCallback cb = uiCallback;
+            if (cb != null) {
+                cb.onBluetoothStatus("Server Stopped", null, false);
+                cb.onGpsUpdate(false, 0, 0, 0, 0, 0, 0);
+            }
+        });
+
+        Intent stopped = new Intent(ACTION_STOPPED);
+        stopped.setPackage(getPackageName());
+        sendBroadcast(stopped);
+    }
+
+    // -------------------------------------------------------------------------
+    // GPS
+    // -------------------------------------------------------------------------
 
     @SuppressWarnings("MissingPermission")
     private void startGps() {
@@ -116,22 +186,22 @@ public class GpsBluetoothService extends Service {
     }
 
     private void stopGps() {
-        try { locationManager.removeUpdates(locationListener); } catch (Exception ignored) {}
-        try { locationManager.unregisterGnssStatusCallback(gnssStatusCallback); } catch (Exception ignored) {}
-        try { locationManager.removeNmeaListener(nmeaListener); } catch (Exception ignored) {}
+        try { locationManager.removeUpdates(locationListener); }                   catch (Exception ignored) {}
+        try { locationManager.unregisterGnssStatusCallback(gnssStatusCallback); }  catch (Exception ignored) {}
+        try { locationManager.removeNmeaListener(nmeaListener); }                  catch (Exception ignored) {}
     }
 
     private final LocationListener locationListener = new LocationListener() {
         @Override
         public void onLocationChanged(@NonNull Location loc) {
             hasFix = true;
-            if (uiCallback != null) {
-                uiCallback.onGpsUpdate(true, satsUsed, satsInView,
+            UiCallback cb = uiCallback;
+            if (cb != null) {
+                cb.onGpsUpdate(true, satsUsed, satsInView,
                         loc.getLatitude(), loc.getLongitude(),
                         loc.getAltitude(), loc.getSpeed());
             }
         }
-
         @Override
         public void onProviderDisabled(@NonNull String provider) { hasFix = false; }
     };
@@ -140,66 +210,84 @@ public class GpsBluetoothService extends Service {
         @Override
         public void onSatelliteStatusChanged(@NonNull GnssStatus status) {
             int inView = status.getSatelliteCount();
-            int used = 0;
-            for (int i = 0; i < inView; i++) {
-                if (status.usedInFix(i)) used++;
-            }
+            int used   = 0;
+            for (int i = 0; i < inView; i++) if (status.usedInFix(i)) used++;
             satsInView = inView;
-            satsUsed = used;
+            satsUsed   = used;
         }
-
         @Override
         public void onFirstFix(int ttffMillis) { hasFix = true; }
     };
 
     private final android.location.OnNmeaMessageListener nmeaListener = (message, timestamp) -> {
         if (!running) return;
-        while (!writeQueue.offer(message)) {
-            writeQueue.poll();
-        }
-        
+        while (!writeQueue.offer(message)) writeQueue.poll(); // drop oldest on overflow
         UiCallback cb = uiCallback;
         if (cb != null) {
             handler.post(() -> {
-                UiCallback innerCb = uiCallback;
-                if (innerCb != null) innerCb.onNmeaLog(message);
+                UiCallback inner = uiCallback;
+                if (inner != null) inner.onNmeaLog(message);
             });
         }
     };
 
+    // -------------------------------------------------------------------------
+    // Bluetooth Server
+    // -------------------------------------------------------------------------
+
     @SuppressWarnings("MissingPermission")
     private void startServer() {
         if (btAdapter == null) return;
-        
         if (!btAdapter.isEnabled()) {
-             handler.post(() -> notifyBtStatus("Bluetooth Disabled", false));
-             return;
+            handler.post(() -> notifyBtStatus("Bluetooth Disabled", false));
+            return;
         }
 
         new Thread(() -> {
+            // FIX #3: create and snapshot serverSocket inside thread to eliminate
+            // the race where onDestroy() nulls the field before accept() reads it
+            BluetoothServerSocket localServer;
             try {
-                serverSocket = btAdapter.listenUsingRfcommWithServiceRecord("GPSLinkServer", SPP_UUID);
+                localServer  = btAdapter.listenUsingRfcommWithServiceRecord(
+                        "GPSLinkServer", SPP_UUID);
+                serverSocket = localServer; // publish ref so onDestroy can close it
+            } catch (IOException e) {
+                handler.post(() -> notifyBtStatus("BT listen failed", false));
+                return;
+            }
+
+            try {
                 while (running) {
                     handler.post(() -> notifyBtStatus("Waiting for connection...", false));
-                    BluetoothSocket socket = serverSocket.accept();
-                    if (socket != null) {
-                        closeClientSocket(); // Close previous client if any
-                        btSocket = socket;
-                        btOut = socket.getOutputStream();
-                        String name = getDeviceName(socket.getRemoteDevice());
-                        handler.post(() -> {
-                            updateNotification("Connected: " + name);
-                            notifyBtStatusConnected(name);
-                        });
+                    BluetoothSocket socket = localServer.accept();
+                    if (socket == null || !running) {
+                        closeSilently(socket);
+                        break;
                     }
+                    closeClientSocket();
+                    btSocket = socket;
+                    btOut    = socket.getOutputStream();
+
+                    // FIX #5: persist last connected device address for boot auto-start
+                    Prefs.saveLastDevice(
+                            GpsBluetoothService.this,
+                            socket.getRemoteDevice().getAddress());
+
+                    String name = getDeviceName(socket.getRemoteDevice());
+                    handler.post(() -> {
+                        updateNotification("Connected: " + name);
+                        notifyBtStatusConnected(name);
+                    });
                 }
             } catch (IOException e) {
-                if (running) {
-                    handler.post(() -> notifyBtStatus("Server stopped", false));
-                }
+                if (running) handler.post(() -> notifyBtStatus("Server stopped", false));
             }
         }, "BT-Server").start();
     }
+
+    // -------------------------------------------------------------------------
+    // Bluetooth Write Thread
+    // -------------------------------------------------------------------------
 
     private void startWriteThread() {
         writeThread = new Thread(() -> {
@@ -228,58 +316,62 @@ public class GpsBluetoothService extends Service {
 
     private void closeClientSocket() {
         BluetoothSocket socket = btSocket;
-        btOut = null;
+        btOut    = null;
         btSocket = null;
-        if (socket != null) {
-            try { socket.close(); } catch (IOException ignored) {}
-        }
+        if (socket != null) try { socket.close(); } catch (IOException ignored) {}
         writeQueue.clear();
     }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
 
     @SuppressWarnings("MissingPermission")
     private String getDeviceName(BluetoothDevice device) {
         try {
             String n = device.getName();
-            return n != null ? n : device.getAddress();
+            return (n != null) ? n : device.getAddress();
         } catch (Exception e) {
             return device.getAddress();
         }
     }
 
+    // FIX #2: snapshot both uiCallback and btSocket to prevent TOCTOU NPE
+    // across the BT-Write and main threads
     private void notifyBtStatus(String status, boolean connected) {
         UiCallback cb = uiCallback;
-        if (cb != null) {
-            BluetoothSocket socket = btSocket;
-            cb.onBluetoothStatus(status,
-                    socket != null ? getDeviceName(socket.getRemoteDevice()) : null,
-                    connected);
+        if (cb == null) return;
+        BluetoothSocket socket = btSocket; // atomic snapshot
+        String name = null;
+        if (socket != null) {
+            try { name = getDeviceName(socket.getRemoteDevice()); }
+            catch (Exception ignored) {}
         }
+        cb.onBluetoothStatus(status, name, connected);
     }
 
     private void notifyBtStatusConnected(String name) {
         UiCallback cb = uiCallback;
-        if (cb != null) {
-            cb.onBluetoothStatus("Connected", name, true);
-        }
+        if (cb != null) cb.onBluetoothStatus("Connected", name, true);
     }
 
     private void closeSilently(Object sock) {
         if (sock == null) return;
         try {
-            if (sock instanceof BluetoothSocket) ((BluetoothSocket) sock).close();
+            if (sock instanceof BluetoothSocket)            ((BluetoothSocket) sock).close();
             else if (sock instanceof BluetoothServerSocket) ((BluetoothServerSocket) sock).close();
         } catch (IOException ignored) {}
     }
 
     private void updateNotification(String text) {
-        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        NotificationManager nm =
+                (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         nm.notify(NOTIF_ID, buildNotification(text));
     }
 
     private Notification buildNotification(String text) {
-        Intent pi = new Intent(this, MainActivity.class);
-        PendingIntent contentIntent = PendingIntent.getActivity(this, 0, pi,
-                PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent contentIntent = PendingIntent.getActivity(this, 0,
+                new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE);
 
         Intent stopIntent = new Intent(this, GpsBluetoothService.class);
         stopIntent.setAction(ACTION_STOP);
@@ -300,30 +392,10 @@ public class GpsBluetoothService extends Service {
         NotificationChannel ch = new NotificationChannel(
                 CHANNEL_ID, "GPS Streaming", NotificationManager.IMPORTANCE_LOW);
         ch.setDescription("GPS NMEA streaming over Bluetooth");
-        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(ch);
+        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE))
+                .createNotificationChannel(ch);
     }
 
-
-    public void setUiCallback(UiCallback cb) {
-        uiCallback = cb;
-    }
-
+    public void setUiCallback(UiCallback cb) { uiCallback = cb; }
     public boolean isRunning() { return running; }
-
-    @Override
-    public void onDestroy() {
-        running = false;
-        stopGps();
-        handler.removeCallbacksAndMessages(null);
-        if (writeThread != null) writeThread.interrupt();
-        closeSilently(serverSocket);
-        closeClientSocket();
-        serverSocket = null;
-        writeThread = null;
-        if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
-        Intent stopIntent = new Intent(ACTION_STOPPED);
-        stopIntent.setPackage(getPackageName());
-        sendBroadcast(stopIntent);
-        super.onDestroy();
-    }
 }
