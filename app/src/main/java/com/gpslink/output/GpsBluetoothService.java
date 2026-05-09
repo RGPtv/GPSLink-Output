@@ -211,9 +211,13 @@ public class GpsBluetoothService extends Service {
 
             if (loc.hasSpeed()) {
                 lastSpeed = loc.getSpeed();
+            } else {
+                lastSpeed = 0.0f;
             }
             if (loc.hasBearing()) {
                 lastBearing = loc.getBearing();
+            } else {
+                lastBearing = 0.0f;
             }
 
             UiCallback cb = uiCallback;
@@ -248,7 +252,9 @@ public class GpsBluetoothService extends Service {
 
         String header = message.substring(0, commaIndex);
         if (!header.endsWith("RMC") && !header.endsWith("GGA") && 
-            !header.endsWith("GSA") && !header.endsWith("GSV")) {
+            !header.endsWith("GSA") && !header.endsWith("GSV") &&
+            !header.endsWith("VTG") && !header.endsWith("GLL") &&
+            !header.endsWith("ZDA")) {
             return;
         }
 
@@ -257,6 +263,17 @@ public class GpsBluetoothService extends Service {
             finalMessage = overrideGgaAltitude(message, lastAltitude);
         } else if (header.endsWith("RMC")) {
             finalMessage = overrideRmcSpeedAndCourse(message, lastSpeed, lastBearing);
+        } else if (header.endsWith("VTG")) {
+            finalMessage = overrideVtgSpeedAndCourse(message, lastSpeed, lastBearing);
+        }
+
+        // Strictly enforce \r\n line endings for NMEA compliance
+        if (!finalMessage.endsWith("\r\n")) {
+            if (finalMessage.endsWith("\n")) {
+                finalMessage = finalMessage.substring(0, finalMessage.length() - 1) + "\r\n";
+            } else {
+                finalMessage += "\r\n";
+            }
         }
 
         while (!writeQueue.offer(finalMessage)) writeQueue.poll(); // drop oldest on overflow
@@ -271,6 +288,7 @@ public class GpsBluetoothService extends Service {
     };
 
     private String overrideGgaAltitude(String message, double altitude) {
+        if (Double.isNaN(altitude)) return message;
         try {
             int starIdx = message.lastIndexOf('*');
             if (starIdx == -1) return message;
@@ -279,12 +297,17 @@ public class GpsBluetoothService extends Service {
             String[] parts = core.split(",", -1);
             if (parts.length < 10) return message;
             
+            // Do not override if the GPS reports no fix (quality "0")
+            if (parts.length > 6 && "0".equals(parts[6])) return message;
+            
             // GGA altitude is in meters
             parts[9] = String.format(java.util.Locale.US, "%.1f", altitude);
+            if (parts.length > 10 && parts[10].isEmpty()) parts[10] = "M";
             
             // Zero the geoid separation so the receiver doesn't miscalculate
             if (parts.length > 11) {
                 parts[11] = "0.0";
+                if (parts.length > 12 && parts[12].isEmpty()) parts[12] = "M";
             }
             
             StringBuilder sb = new StringBuilder();
@@ -306,6 +329,7 @@ public class GpsBluetoothService extends Service {
     }
 
     private String overrideRmcSpeedAndCourse(String message, float speedMps, float bearing) {
+        if (Float.isNaN(speedMps) || Float.isNaN(bearing)) return message;
         try {
             int starIdx = message.lastIndexOf('*');
             if (starIdx == -1) return message;
@@ -314,12 +338,56 @@ public class GpsBluetoothService extends Service {
             String[] parts = core.split(",", -1);
             if (parts.length < 10) return message;
             
+            // Do not override if the GPS reports warning/no fix ("V")
+            if (parts.length > 2 && "V".equals(parts[2])) return message;
+            
             // Speed in knots (1 m/s = 1.943844 knots)
             double speedKnots = speedMps * 1.943844;
             parts[7] = String.format(java.util.Locale.US, "%.1f", speedKnots);
             
             // Track angle / Course in degrees
             parts[8] = String.format(java.util.Locale.US, "%.1f", bearing);
+            
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < parts.length; i++) {
+                sb.append(parts[i]);
+                if (i < parts.length - 1) sb.append(",");
+            }
+            
+            String newCore = sb.toString();
+            int checksum = 0;
+            for (int i = 1; i < newCore.length(); i++) { // Skip '$'
+                checksum ^= newCore.charAt(i);
+            }
+            
+            return newCore + String.format(java.util.Locale.US, "*%02X\r\n", checksum);
+        } catch (Exception e) {
+            return message;
+        }
+    }
+
+    private String overrideVtgSpeedAndCourse(String message, float speedMps, float bearing) {
+        if (Float.isNaN(speedMps) || Float.isNaN(bearing)) return message;
+        try {
+            int starIdx = message.lastIndexOf('*');
+            if (starIdx == -1) return message;
+            
+            String core = message.substring(0, starIdx);
+            String[] parts = core.split(",", -1);
+            if (parts.length < 8) return message;
+            
+            parts[1] = String.format(java.util.Locale.US, "%.1f", bearing);
+            if (parts.length > 2 && parts[2].isEmpty()) parts[2] = "T";
+            
+            double speedKnots = speedMps * 1.943844;
+            parts[5] = String.format(java.util.Locale.US, "%.1f", speedKnots);
+            if (parts.length > 6 && parts[6].isEmpty()) parts[6] = "N";
+            
+            if (parts.length > 7) {
+                double speedKmh = speedMps * 3.6;
+                parts[7] = String.format(java.util.Locale.US, "%.1f", speedKmh);
+                if (parts.length > 8 && parts[8].isEmpty()) parts[8] = "K";
+            }
             
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < parts.length; i++) {
