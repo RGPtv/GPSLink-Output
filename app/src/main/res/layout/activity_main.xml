@@ -29,7 +29,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="GPSLink-Output"
-                    android:textColor="@color/accent"
+                    android:textColor="@color/text_primary"
                     android:textSize="28sp"
                     android:fontFamily="sans-serif-black"
                     android:letterSpacing="-0.02" />
@@ -380,7 +380,7 @@
             android:textSize="16sp"
             android:letterSpacing="0.05"
             android:textStyle="bold"
-            android:backgroundTint="@color/accent"
+            android:backgroundTint="@color/green"
             android:elevation="6dp" />
 
     </LinearLayout>
