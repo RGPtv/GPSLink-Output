@@ -24,6 +24,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -65,13 +66,13 @@ public class MainActivity extends AppCompatActivity {
                                 double lat, double lon, double alt, float speed) {
             runOnUiThread(() -> {
                 tvFix.setText(hasFix ? "Fix" : "No Fix");
-                tvFix.setTextColor(getColor(hasFix ? R.color.green : R.color.red));
+                tvFix.setTextColor(ContextCompat.getColor(MainActivity.this, hasFix ? R.color.green : R.color.red));
                 tvSats.setText(satsUsed + " / " + satsInView);
                 if (hasFix) {
-                    tvLat.setText(String.format("%.6f", lat));
-                    tvLon.setText(String.format("%.6f", lon));
-                    tvAlt.setText(String.format("%.1f", alt));
-                    tvSpeed.setText(String.format("%.1f", speed * 3.6f));
+                    tvLat.setText(String.format(java.util.Locale.US, "%.6f", lat));
+                    tvLon.setText(String.format(java.util.Locale.US, "%.6f", lon));
+                    tvAlt.setText(String.format(java.util.Locale.US, "%.1f", alt));
+                    tvSpeed.setText(String.format(java.util.Locale.US, "%.1f", speed * 3.6f));
                 }
             });
         }
@@ -79,8 +80,8 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onBluetoothStatus(String status, String deviceName, boolean connected) {
             runOnUiThread(() -> {
-                tvBtStatus.setText(status.toUpperCase());
-                tvBtStatus.setTextColor(getColor(connected ? R.color.accent : R.color.text_secondary));
+                tvBtStatus.setText(status.toUpperCase(java.util.Locale.US));
+                tvBtStatus.setTextColor(ContextCompat.getColor(MainActivity.this, connected ? R.color.accent : R.color.text_secondary));
                 tvBtDevice.setText(deviceName != null ? deviceName : "None");
             });
         }
@@ -129,9 +130,9 @@ public class MainActivity extends AppCompatActivity {
             else stopServiceAction();
         });
 
-        registerReceiver(serviceStopReceiver,
+        ContextCompat.registerReceiver(this, serviceStopReceiver,
                 new IntentFilter(GpsBluetoothService.ACTION_STOPPED),
-                RECEIVER_NOT_EXPORTED);
+                ContextCompat.RECEIVER_NOT_EXPORTED);
 
         checkPermissions();
     }
@@ -201,7 +202,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateToggleButton() {
         btnToggle.setText(running ? "SHUTDOWN SERVER" : "INITIALIZE SERVER");
-        btnToggle.setBackgroundTintList(getColorStateList(running ? R.color.red : R.color.green));
+        btnToggle.setBackgroundTintList(ContextCompat.getColorStateList(this, running ? R.color.red : R.color.green));
     }
 
     @Override

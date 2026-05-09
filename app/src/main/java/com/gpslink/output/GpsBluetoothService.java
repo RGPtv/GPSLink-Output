@@ -42,13 +42,13 @@ public class GpsBluetoothService extends Service {
     private static final long RECONNECT_DELAY_MS = 3000;
 
     private final IBinder binder = new LocalBinder();
-    private UiCallback uiCallback;
+    private volatile UiCallback uiCallback;
 
     private LocationManager locationManager;
     private BluetoothAdapter btAdapter;
-    private BluetoothServerSocket serverSocket;
-    private BluetoothSocket btSocket;
-    private OutputStream btOut;
+    private volatile BluetoothServerSocket serverSocket;
+    private volatile BluetoothSocket btSocket;
+    private volatile OutputStream btOut;
     private final LinkedBlockingQueue<String> writeQueue = new LinkedBlockingQueue<>(100);
     private Thread writeThread;
 
@@ -154,16 +154,27 @@ public class GpsBluetoothService extends Service {
 
     private final android.location.OnNmeaMessageListener nmeaListener = (message, timestamp) -> {
         if (!running) return;
-        writeQueue.offer(message);
-        if (uiCallback != null) {
+        while (!writeQueue.offer(message)) {
+            writeQueue.poll();
+        }
+        
+        UiCallback cb = uiCallback;
+        if (cb != null) {
             handler.post(() -> {
-                if (uiCallback != null) uiCallback.onNmeaLog(message);
+                UiCallback innerCb = uiCallback;
+                if (innerCb != null) innerCb.onNmeaLog(message);
             });
         }
     };
 
+    @SuppressWarnings("MissingPermission")
     private void startServer() {
         if (btAdapter == null) return;
+        
+        if (!btAdapter.isEnabled()) {
+             handler.post(() -> notifyBtStatus("Bluetooth Disabled", false));
+             return;
+        }
 
         new Thread(() -> {
             try {
@@ -195,8 +206,10 @@ public class GpsBluetoothService extends Service {
             while (running) {
                 try {
                     String msg = writeQueue.take();
-                    if (btOut != null) {
-                        btOut.write(msg.getBytes());
+                    OutputStream out = btOut;
+                    if (out != null) {
+                        out.write(msg.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+                        out.flush();
                     }
                 } catch (InterruptedException e) {
                     break;
@@ -214,10 +227,11 @@ public class GpsBluetoothService extends Service {
     }
 
     private void closeClientSocket() {
+        BluetoothSocket socket = btSocket;
         btOut = null;
-        if (btSocket != null) {
-            try { btSocket.close(); } catch (IOException ignored) {}
-            btSocket = null;
+        btSocket = null;
+        if (socket != null) {
+            try { socket.close(); } catch (IOException ignored) {}
         }
         writeQueue.clear();
     }
@@ -233,16 +247,19 @@ public class GpsBluetoothService extends Service {
     }
 
     private void notifyBtStatus(String status, boolean connected) {
-        if (uiCallback != null) {
-            uiCallback.onBluetoothStatus(status,
-                    btSocket != null ? getDeviceName(btSocket.getRemoteDevice()) : null,
+        UiCallback cb = uiCallback;
+        if (cb != null) {
+            BluetoothSocket socket = btSocket;
+            cb.onBluetoothStatus(status,
+                    socket != null ? getDeviceName(socket.getRemoteDevice()) : null,
                     connected);
         }
     }
 
     private void notifyBtStatusConnected(String name) {
-        if (uiCallback != null) {
-            uiCallback.onBluetoothStatus("Connected", name, true);
+        UiCallback cb = uiCallback;
+        if (cb != null) {
+            cb.onBluetoothStatus("Connected", name, true);
         }
     }
 
@@ -304,7 +321,9 @@ public class GpsBluetoothService extends Service {
         serverSocket = null;
         writeThread = null;
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
-        sendBroadcast(new Intent(ACTION_STOPPED));
+        Intent stopIntent = new Intent(ACTION_STOPPED);
+        stopIntent.setPackage(getPackageName());
+        sendBroadcast(stopIntent);
         super.onDestroy();
     }
 }
