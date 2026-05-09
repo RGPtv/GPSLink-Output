@@ -321,8 +321,7 @@
         <!-- Live NMEA Log -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
+            android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/card_bg"
             android:padding="0dp"
@@ -330,32 +329,44 @@
             android:layout_marginBottom="24dp">
             
             <LinearLayout
+                android:id="@+id/logHeader"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@drawable/log_header_bg"
                 android:paddingHorizontal="16dp"
-                android:paddingVertical="10dp">
+                android:paddingVertical="10dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:clickable="true"
+                android:focusable="true">
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:text="TERMINAL OUTPUT"
                     android:textColor="@color/text_primary"
                     android:textSize="10sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.1" />
+                <ImageView
+                    android:id="@+id/ivLogToggle"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@android:drawable/arrow_down_float"
+                    app:tint="@color/text_secondary" />
             </LinearLayout>
 
             <TextView
                 android:id="@+id/tvLog"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:minHeight="140dp"
+                android:layout_height="200dp"
                 android:background="#050608"
                 android:textColor="@color/green"
                 android:textSize="9.5sp"
                 android:fontFamily="monospace"
                 android:padding="12dp"
                 android:lineSpacingExtra="2dp"
+                android:scrollbars="vertical"
                 android:text="System Initialized.\nWaiting for NMEA stream..." />
         </LinearLayout>
 
