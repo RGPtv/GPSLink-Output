@@ -191,15 +191,26 @@ public class GpsBluetoothService extends Service {
         try { locationManager.removeNmeaListener(nmeaListener); }                  catch (Exception ignored) {}
     }
 
+    private volatile double lastAltitude = 0.0;
+
     private final LocationListener locationListener = new LocationListener() {
         @Override
         public void onLocationChanged(@NonNull Location loc) {
             hasFix = true;
+            
+            double alt = loc.getAltitude();
+            if (Build.VERSION.SDK_INT >= 34) { // Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+                if (loc.hasMslAltitude()) {
+                    alt = loc.getMslAltitudeMeters();
+                }
+            }
+            lastAltitude = alt;
+
             UiCallback cb = uiCallback;
             if (cb != null) {
                 cb.onGpsUpdate(true, satsUsed, satsInView,
                         loc.getLatitude(), loc.getLongitude(),
-                        loc.getAltitude(), loc.getSpeed());
+                        alt, loc.getSpeed());
             }
         }
         @Override
@@ -231,15 +242,56 @@ public class GpsBluetoothService extends Service {
             return;
         }
 
-        while (!writeQueue.offer(message)) writeQueue.poll(); // drop oldest on overflow
+        String finalMessage = message;
+        if (header.endsWith("GGA")) {
+            finalMessage = overrideGgaAltitude(message, lastAltitude);
+        }
+
+        while (!writeQueue.offer(finalMessage)) writeQueue.poll(); // drop oldest on overflow
         UiCallback cb = uiCallback;
         if (cb != null) {
+            String msgToLog = finalMessage;
             handler.post(() -> {
                 UiCallback inner = uiCallback;
-                if (inner != null) inner.onNmeaLog(message);
+                if (inner != null) inner.onNmeaLog(msgToLog);
             });
         }
     };
+
+    private String overrideGgaAltitude(String message, double altitude) {
+        try {
+            int starIdx = message.lastIndexOf('*');
+            if (starIdx == -1) return message;
+            
+            String core = message.substring(0, starIdx);
+            String[] parts = core.split(",", -1);
+            if (parts.length < 10) return message;
+            
+            // GGA altitude is in meters
+            parts[9] = String.format(java.util.Locale.US, "%.1f", altitude);
+            
+            // Zero the geoid separation so the receiver doesn't miscalculate
+            if (parts.length > 11) {
+                parts[11] = "0.0";
+            }
+            
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < parts.length; i++) {
+                sb.append(parts[i]);
+                if (i < parts.length - 1) sb.append(",");
+            }
+            
+            String newCore = sb.toString();
+            int checksum = 0;
+            for (int i = 1; i < newCore.length(); i++) { // Skip '$'
+                checksum ^= newCore.charAt(i);
+            }
+            
+            return newCore + String.format(java.util.Locale.US, "*%02X\r\n", checksum);
+        } catch (Exception e) {
+            return message;
+        }
+    }
 
     // -------------------------------------------------------------------------
     // Bluetooth Server
