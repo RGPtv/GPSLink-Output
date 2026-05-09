@@ -193,6 +193,8 @@ public class GpsBluetoothService extends Service {
     }
 
     private volatile double lastAltitude = 0.0;
+    private volatile float lastSpeed = 0.0f;
+    private volatile float lastBearing = 0.0f;
 
     private final LocationListener locationListener = new LocationListener() {
         @Override
@@ -206,6 +208,13 @@ public class GpsBluetoothService extends Service {
                 }
             }
             lastAltitude = alt;
+
+            if (loc.hasSpeed()) {
+                lastSpeed = loc.getSpeed();
+            }
+            if (loc.hasBearing()) {
+                lastBearing = loc.getBearing();
+            }
 
             UiCallback cb = uiCallback;
             if (cb != null) {
@@ -246,6 +255,8 @@ public class GpsBluetoothService extends Service {
         String finalMessage = message;
         if (header.endsWith("GGA")) {
             finalMessage = overrideGgaAltitude(message, lastAltitude);
+        } else if (header.endsWith("RMC")) {
+            finalMessage = overrideRmcSpeedAndCourse(message, lastSpeed, lastBearing);
         }
 
         while (!writeQueue.offer(finalMessage)) writeQueue.poll(); // drop oldest on overflow
@@ -275,6 +286,40 @@ public class GpsBluetoothService extends Service {
             if (parts.length > 11) {
                 parts[11] = "0.0";
             }
+            
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < parts.length; i++) {
+                sb.append(parts[i]);
+                if (i < parts.length - 1) sb.append(",");
+            }
+            
+            String newCore = sb.toString();
+            int checksum = 0;
+            for (int i = 1; i < newCore.length(); i++) { // Skip '$'
+                checksum ^= newCore.charAt(i);
+            }
+            
+            return newCore + String.format(java.util.Locale.US, "*%02X\r\n", checksum);
+        } catch (Exception e) {
+            return message;
+        }
+    }
+
+    private String overrideRmcSpeedAndCourse(String message, float speedMps, float bearing) {
+        try {
+            int starIdx = message.lastIndexOf('*');
+            if (starIdx == -1) return message;
+            
+            String core = message.substring(0, starIdx);
+            String[] parts = core.split(",", -1);
+            if (parts.length < 10) return message;
+            
+            // Speed in knots (1 m/s = 1.943844 knots)
+            double speedKnots = speedMps * 1.943844;
+            parts[7] = String.format(java.util.Locale.US, "%.1f", speedKnots);
+            
+            // Track angle / Course in degrees
+            parts[8] = String.format(java.util.Locale.US, "%.1f", bearing);
             
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < parts.length; i++) {
