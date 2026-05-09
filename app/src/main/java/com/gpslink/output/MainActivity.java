@@ -12,8 +12,11 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.view.View;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -32,6 +35,9 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvFix, tvSats, tvLat, tvLon, tvAlt, tvSpeed,
                      tvBtStatus, tvBtDevice, tvLog;
     private Button btnToggle;
+    private LinearLayout logHeader;
+    private ImageView ivLogToggle;
+    private boolean isLogVisible = true;
 
     private GpsBluetoothService service;
     private boolean bound = false;
@@ -139,6 +145,18 @@ public class MainActivity extends AppCompatActivity {
         tvBtDevice = findViewById(R.id.tvBtDevice);
         tvLog      = findViewById(R.id.tvLog);
         btnToggle  = findViewById(R.id.btnToggle);
+        logHeader  = findViewById(R.id.logHeader);
+        ivLogToggle = findViewById(R.id.ivLogToggle);
+
+        tvLog.setMovementMethod(new android.text.method.ScrollingMovementMethod());
+
+        logHeader.setOnClickListener(v -> {
+            isLogVisible = !isLogVisible;
+            tvLog.setVisibility(isLogVisible ? View.VISIBLE : View.GONE);
+            ivLogToggle.setImageResource(isLogVisible ? 
+                android.R.drawable.arrow_down_float : 
+                android.R.drawable.arrow_up_float);
+        });
 
         btnToggle.setOnClickListener(v -> {
             if (!deriveRunning()) startServiceAction();
