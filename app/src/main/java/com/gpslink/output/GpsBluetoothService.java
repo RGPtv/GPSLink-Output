@@ -220,7 +220,17 @@ public class GpsBluetoothService extends Service {
     };
 
     private final android.location.OnNmeaMessageListener nmeaListener = (message, timestamp) -> {
-        if (!running) return;
+        if (!running || message == null || message.length() < 6 || !message.startsWith("$")) return;
+
+        int commaIndex = message.indexOf(',');
+        if (commaIndex == -1) return;
+
+        String header = message.substring(0, commaIndex);
+        if (!header.endsWith("RMC") && !header.endsWith("GGA") && 
+            !header.endsWith("GSA") && !header.endsWith("GSV")) {
+            return;
+        }
+
         while (!writeQueue.offer(message)) writeQueue.poll(); // drop oldest on overflow
         UiCallback cb = uiCallback;
         if (cb != null) {
