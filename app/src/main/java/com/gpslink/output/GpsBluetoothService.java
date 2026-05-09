@@ -192,6 +192,8 @@ public class GpsBluetoothService extends Service {
         try { locationManager.removeNmeaListener(nmeaListener); }                  catch (Exception ignored) {}
     }
 
+    private volatile double lastLat = 0.0;
+    private volatile double lastLon = 0.0;
     private volatile double lastAltitude = 0.0;
     private volatile float lastSpeed = 0.0f;
     private volatile float lastBearing = 0.0f;
@@ -207,6 +209,8 @@ public class GpsBluetoothService extends Service {
                     alt = loc.getMslAltitudeMeters();
                 }
             }
+            lastLat = loc.getLatitude();
+            lastLon = loc.getLongitude();
             lastAltitude = alt;
 
             if (loc.hasSpeed()) {
@@ -239,6 +243,12 @@ public class GpsBluetoothService extends Service {
             for (int i = 0; i < inView; i++) if (status.usedInFix(i)) used++;
             satsInView = inView;
             satsUsed   = used;
+            
+            UiCallback cb = uiCallback;
+            if (cb != null) {
+                // Run on UI thread if required, but callback wrapper in MainActivity handles runOnUiThread
+                cb.onGpsUpdate(hasFix, satsUsed, satsInView, lastLat, lastLon, lastAltitude, lastSpeed);
+            }
         }
         @Override
         public void onFirstFix(int ttffMillis) { hasFix = true; }
@@ -434,7 +444,9 @@ public class GpsBluetoothService extends Service {
 
             try {
                 while (running) {
-                    handler.post(() -> notifyBtStatus("Waiting for connection...", false));
+                    if (btSocket == null) {
+                        handler.post(() -> notifyBtStatus("Waiting for connection...", false));
+                    }
                     BluetoothSocket socket = localServer.accept();
                     if (socket == null || !running) {
                         closeSilently(socket);
@@ -487,7 +499,9 @@ public class GpsBluetoothService extends Service {
 
     private void handleBluetoothDisconnect() {
         closeClientSocket();
-        handler.post(() -> notifyBtStatus("Client Disconnected", false));
+        if (running) {
+            handler.post(() -> notifyBtStatus("Waiting for connection...", false));
+        }
     }
 
     private void closeClientSocket() {
