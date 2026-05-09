@@ -92,7 +92,7 @@ public class MainActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 tvBtStatus.setText(status.toUpperCase(java.util.Locale.US));
                 tvBtStatus.setTextColor(ContextCompat.getColor(
-                        MainActivity.this, connected ? R.color.accent : R.color.text_secondary));
+                        MainActivity.this, connected ? R.color.green : R.color.text_secondary));
                 tvBtDevice.setText(deviceName != null ? deviceName : "None");
             });
         }
@@ -250,7 +250,7 @@ public class MainActivity extends AppCompatActivity {
         boolean running = deriveRunning();
         btnToggle.setText(running ? "SHUTDOWN SERVER" : "INITIALIZE SERVER");
         btnToggle.setBackgroundTintList(
-                ContextCompat.getColorStateList(this, running ? R.color.red : R.color.accent));
+                ContextCompat.getColorStateList(this, running ? R.color.red : R.color.green));
     }
 
     // -------------------------------------------------------------------------
