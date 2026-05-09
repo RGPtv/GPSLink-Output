@@ -109,6 +109,11 @@ public class MainActivity extends AppCompatActivity {
                 tvLog.setText(logBuilder.toString());
             });
         }
+
+        @Override
+        public void onServiceStateChanged(boolean isRunning) {
+            runOnUiThread(() -> updateToggleButton());
+        }
     };
 
     // FIX #11: react to service stop via broadcast; derive state from service, not local flag

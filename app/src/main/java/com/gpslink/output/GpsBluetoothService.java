@@ -74,6 +74,7 @@ public class GpsBluetoothService extends Service {
                          double lat, double lon, double alt, float speed);
         void onBluetoothStatus(String status, String deviceName, boolean connected);
         void onNmeaLog(String message);
+        void onServiceStateChanged(boolean isRunning);
     }
 
     public class LocalBinder extends Binder {
@@ -119,6 +120,12 @@ public class GpsBluetoothService extends Service {
             }
 
             running = true;
+            
+            handler.post(() -> {
+                UiCallback cb = uiCallback;
+                if (cb != null) cb.onServiceStateChanged(true);
+            });
+            
             startGps();
             startWriteThread();
             startServer();
@@ -166,6 +173,7 @@ public class GpsBluetoothService extends Service {
             if (cb != null) {
                 cb.onBluetoothStatus("Server Stopped", null, false);
                 cb.onGpsUpdate(false, 0, 0, 0, 0, 0, 0);
+                cb.onServiceStateChanged(false);
             }
         });
 
