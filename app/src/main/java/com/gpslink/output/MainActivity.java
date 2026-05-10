@@ -34,7 +34,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQ_PERMISSIONS = 1;
 
     private TextView tvFix, tvSats, tvLat, tvLon, tvAlt, tvSpeed,
-                     tvBtStatus, tvBtDevice, tvLog, tvSatelliteDetails;
+                     tvBtStatus, tvBtDevice, tvLog, tvSatelliteDetails, tvSatelliteList;
     private Button btnToggle;
     private View homeView, satelliteView, terminalView;
     private BottomNavigationView bottomNavigation;
@@ -72,7 +72,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onGpsUpdate(boolean hasFix, int satsUsed, int satsInView,
-                                double lat, double lon, double alt, float speed) {
+                                double lat, double lon, double alt, float speed, String satDetails) {
             runOnUiThread(() -> {
                 tvFix.setText(hasFix ? "Fix" : "No Fix");
                 tvFix.setTextColor(ContextCompat.getColor(
@@ -86,6 +86,9 @@ public class MainActivity extends AppCompatActivity {
                 }
                 if (tvSatelliteDetails != null) {
                     tvSatelliteDetails.setText("Sats In View: " + satsInView + "\nSats Used: " + satsUsed + "\nFix: " + (hasFix ? "Acquired" : "Pending"));
+                }
+                if (tvSatelliteList != null) {
+                    tvSatelliteList.setText(satDetails);
                 }
             });
         }
@@ -148,6 +151,7 @@ public class MainActivity extends AppCompatActivity {
         tvBtDevice = findViewById(R.id.tvBtDevice);
         tvLog      = findViewById(R.id.tvLog);
         tvSatelliteDetails = findViewById(R.id.tvSatelliteDetails);
+        tvSatelliteList = findViewById(R.id.tvSatelliteList);
         btnToggle  = findViewById(R.id.btnToggle);
         
         homeView = findViewById(R.id.homeView);

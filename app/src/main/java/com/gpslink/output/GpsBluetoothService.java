@@ -62,6 +62,7 @@ public class GpsBluetoothService extends Service {
     private int satsUsed   = 0;
     private int satsInView = 0;
     private boolean hasFix = false;
+    private volatile String lastSatDetails = "";
 
     // FIX #6: writeBuffer removed — was allocated but never used
 
@@ -71,7 +72,7 @@ public class GpsBluetoothService extends Service {
 
     public interface UiCallback {
         void onGpsUpdate(boolean hasFix, int satsUsed, int satsInView,
-                         double lat, double lon, double alt, float speed);
+                         double lat, double lon, double alt, float speed, String satDetails);
         void onBluetoothStatus(String status, String deviceName, boolean connected);
         void onNmeaLog(String message);
         void onServiceStateChanged(boolean isRunning);
@@ -146,6 +147,7 @@ public class GpsBluetoothService extends Service {
         hasFix = false;
         satsUsed = 0;
         satsInView = 0;
+        lastSatDetails = "";
         stopGps();
 
         // Interrupt write thread first so it stops trying to write
@@ -172,7 +174,7 @@ public class GpsBluetoothService extends Service {
             UiCallback cb = uiCallback;
             if (cb != null) {
                 cb.onBluetoothStatus("Server Stopped", null, false);
-                cb.onGpsUpdate(false, 0, 0, 0, 0, 0, 0);
+                cb.onGpsUpdate(false, 0, 0, 0, 0, 0, 0, "");
                 cb.onServiceStateChanged(false);
             }
         });
@@ -236,7 +238,7 @@ public class GpsBluetoothService extends Service {
             if (cb != null) {
                 cb.onGpsUpdate(true, satsUsed, satsInView,
                         loc.getLatitude(), loc.getLongitude(),
-                        alt, loc.getSpeed());
+                        alt, loc.getSpeed(), lastSatDetails);
             }
         }
         @Override
@@ -248,19 +250,46 @@ public class GpsBluetoothService extends Service {
         public void onSatelliteStatusChanged(@NonNull GnssStatus status) {
             int inView = status.getSatelliteCount();
             int used   = 0;
-            for (int i = 0; i < inView; i++) if (status.usedInFix(i)) used++;
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format(java.util.Locale.US, "%-3s %-5s %-3s %-4s %-4s %s\n", "ID", "GNSS", "SNR", "ELEV", "AZIM", "ACTIVE"));
+            sb.append("---------------------------------\n");
+            for (int i = 0; i < inView; i++) {
+                boolean isUsed = status.usedInFix(i);
+                if (isUsed) used++;
+                String prn = String.format(java.util.Locale.US, "%03d", status.getSvid(i));
+                String gnss = getConstellationName(status.getConstellationType(i));
+                String snr = String.format(java.util.Locale.US, "%.0f", status.getCn0DbHz(i));
+                String elev = String.format(java.util.Locale.US, "%.0f", status.getElevationDegrees(i));
+                String azim = String.format(java.util.Locale.US, "%.0f", status.getAzimuthDegrees(i));
+                String active = isUsed ? "✓" : "";
+                sb.append(String.format(java.util.Locale.US, "%-3s %-5s %-3s %-4s %-4s   %s\n", prn, gnss, snr, elev, azim, active));
+            }
             satsInView = inView;
             satsUsed   = used;
+            lastSatDetails = sb.toString().trim();
             
             UiCallback cb = uiCallback;
             if (cb != null) {
                 // Run on UI thread if required, but callback wrapper in MainActivity handles runOnUiThread
-                cb.onGpsUpdate(hasFix, satsUsed, satsInView, lastLat, lastLon, lastAltitude, lastSpeed);
+                cb.onGpsUpdate(hasFix, satsUsed, satsInView, lastLat, lastLon, lastAltitude, lastSpeed, lastSatDetails);
             }
         }
         @Override
         public void onFirstFix(int ttffMillis) { hasFix = true; }
     };
+
+    private String getConstellationName(int type) {
+        switch (type) {
+            case GnssStatus.CONSTELLATION_GPS: return "GPS";
+            case GnssStatus.CONSTELLATION_SBAS: return "SBAS";
+            case GnssStatus.CONSTELLATION_GLONASS: return "GLO";
+            case GnssStatus.CONSTELLATION_QZSS: return "QZSS";
+            case GnssStatus.CONSTELLATION_BEIDOU: return "BDS";
+            case GnssStatus.CONSTELLATION_GALILEO: return "GAL";
+            case GnssStatus.CONSTELLATION_IRNSS: return "IRNSS";
+            default: return "UNK";
+        }
+    }
 
     private final android.location.OnNmeaMessageListener nmeaListener = (message, timestamp) -> {
         if (!running || message == null || message.length() < 6 || !message.startsWith("$")) return;
