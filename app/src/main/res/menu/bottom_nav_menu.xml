@@ -2,14 +2,14 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/nav_home"
-        android:icon="@android:drawable/ic_menu_mylocation"
+        android:icon="@drawable/ic_home"
         android:title="Home" />
     <item
         android:id="@+id/nav_satellite"
-        android:icon="@android:drawable/ic_menu_compass"
+        android:icon="@drawable/ic_satellite"
         android:title="GNSS Satellite" />
     <item
         android:id="@+id/nav_terminal"
-        android:icon="@android:drawable/ic_menu_info_details"
+        android:icon="@drawable/ic_terminal"
         android:title="Terminal" />
 </menu>

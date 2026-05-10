@@ -435,8 +435,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#1E1E1E"
-        app:itemIconTint="@color/accent"
-        app:itemTextColor="@color/accent"
+        app:itemIconTint="#FFFFFF"
+        app:itemTextColor="#FFFFFF"
         app:menu="@menu/bottom_nav_menu" />
 
 </LinearLayout>
