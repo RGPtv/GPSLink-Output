@@ -104,16 +104,13 @@ jobs:
       - name: Decode keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" \
-            | tr -d ' \n\r\t' \
-            | base64 --decode > $RUNNER_TEMP/gpslink.keystore
-          # Verify it decoded correctly
-          keytool -list -keystore $RUNNER_TEMP/gpslink.keystore \
-            -storepass ${{ secrets.KEYSTORE_PASSWORD }} -noprompt
+            | tr -d '\n\r ' \
+            | base64 --decode > $RUNNER_TEMP/gpslink-output.keystore
 
       - name: Build Release APK
         run: |
           ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=$RUNNER_TEMP/gpslink.keystore \
+            -Pandroid.injected.signing.store.file=$RUNNER_TEMP/gpslink-output.keystore \
             -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
             -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
             -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
