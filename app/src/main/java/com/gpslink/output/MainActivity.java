@@ -89,19 +89,35 @@ public class MainActivity extends AppCompatActivity {
                     tvSatelliteDetails.setText("Sats In View: " + satsInView + "\nSats Used: " + satsUsed + "\nFix: " + (hasFix ? "Acquired" : "Pending"));
                 }
                 if (tableSatelliteList != null) {
-                    tableSatelliteList.removeViews(1, Math.max(0, tableSatelliteList.getChildCount() - 1));
-                    for (GpsBluetoothService.SatInfo sat : satDetails) {
+                    int currentRows = tableSatelliteList.getChildCount() - 1;
+                    int requiredRows = satDetails.size();
+                    
+                    // Add any missing rows needed
+                    while (currentRows < requiredRows) {
                         android.widget.TableRow row = new android.widget.TableRow(MainActivity.this);
                         row.setPadding(0, 8, 0, 8);
-                        
-                        row.addView(createTableCell(sat.prn));
-                        row.addView(createTableCell(sat.gnss));
-                        row.addView(createTableCell(sat.snr));
-                        row.addView(createTableCell(sat.elev));
-                        row.addView(createTableCell(sat.azim));
-                        row.addView(createTableCell(sat.isUsed ? "✓" : ""));
-                        
+                        for (int i = 0; i < 6; i++) {
+                            row.addView(createTableCell(""));
+                        }
                         tableSatelliteList.addView(row);
+                        currentRows++;
+                    }
+                    
+                    // Update rows and hide excess ones
+                    for (int i = 0; i < currentRows; i++) {
+                        android.widget.TableRow row = (android.widget.TableRow) tableSatelliteList.getChildAt(i + 1);
+                        if (i < requiredRows) {
+                            row.setVisibility(android.view.View.VISIBLE);
+                            GpsBluetoothService.SatInfo sat = satDetails.get(i);
+                            ((TextView) row.getChildAt(0)).setText(sat.prn);
+                            ((TextView) row.getChildAt(1)).setText(sat.gnss);
+                            ((TextView) row.getChildAt(2)).setText(sat.snr);
+                            ((TextView) row.getChildAt(3)).setText(sat.elev);
+                            ((TextView) row.getChildAt(4)).setText(sat.azim);
+                            ((TextView) row.getChildAt(5)).setText(sat.isUsed ? "✓" : "");
+                        } else {
+                            row.setVisibility(android.view.View.GONE);
+                        }
                     }
                 }
             });
