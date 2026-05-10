@@ -5,6 +5,12 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: 'Release notes'
+        required: false
+        default: 'Manual release'
 
 jobs:
   build:
@@ -38,17 +44,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # ── Build ──────────────────────────────────────────────────────────────
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
-
-      # ── Sign release APK (only on push to main/master) ────────────────────
+      # ── Build release APK ──────────────────────────────────────────────────
       - name: Build release APK
-        if: github.event_name == 'push'
         run: ./gradlew assembleRelease
 
+      # ── Sign release APK ───────────────────────────────────────────────────
       - name: Sign release APK
-        if: github.event_name == 'push'
         uses: r0adkll/sign-android-release@v1
         id: sign_apk
         with:
@@ -58,46 +59,37 @@ jobs:
           keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
 
-      # ── Upload debug APK (always) ──────────────────────────────────────────
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: GPSLink-debug-${{ github.run_number }}
-          path: app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
-
-      # ── Upload signed release APK (push only) ─────────────────────────────
+      # ── Upload signed release APK as artifact ──────────────────────────────
       - name: Upload signed release APK
-        if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: GPSLink-release-${{ github.run_number }}
           path: ${{ steps.sign_apk.outputs.signedReleaseFile }}
           retention-days: 30
 
-      # ── Create GitHub Release & attach APK (push to main/master only) ─────
+      # ── Create GitHub Release (only on manual trigger) ─────────────────────
       - name: Get version name
-        if: github.event_name == 'push'
+        if: github.event_name == 'workflow_dispatch'
         id: version
         run: |
           VERSION=$(./gradlew -q printVersionName 2>/dev/null || echo "1.0.${{ github.run_number }}")
           echo "name=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
-        if: github.event_name == 'push'
+        if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.name }}-build${{ github.run_number }}
           name: GPSLink v${{ steps.version.outputs.name }} (Build ${{ github.run_number }})
           body: |
-            ## 🚀 Automated Release
+            ## 🚀 Manual Release
 
             **Branch:** `${{ github.ref_name }}`
             **Commit:** ${{ github.sha }}
             **Build:** #${{ github.run_number }}
 
-            ### Changes
-            ${{ github.event.head_commit.message }}
+            ### Release Notes
+            ${{ github.event.inputs.release_notes }}
           files: ${{ steps.sign_apk.outputs.signedReleaseFile }}
           draft: false
           prerelease: false
