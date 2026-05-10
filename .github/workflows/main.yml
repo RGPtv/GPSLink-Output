@@ -141,20 +141,20 @@ jobs:
             ### Installation
             1. Download `GPSLink-Output-${{ github.event.inputs.version }}.apk` below
             2. Enable **Install unknown apps** on your device
-            3. Go to **Developer Options → Mock Location App** → select GPSLink-Output
-            4. Open the app and grant **Location** and **Bluetooth** permissions
-            5. Pair your Bluetooth GNSS receiver and tap **Start**
+            3. Open the app and grant **Location** and **Bluetooth** permissions
+            4. Pair your Bluetooth GNSS receiver and tap **Start**
 
             ### Requirements
             - Android 8.0+ (API 26)
             - Bluetooth-capable GNSS receiver
-            - Location & Bluetooth permissions
+            - GPS-enabled device
 
-            ### Permissions used
-            - `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` — GPS mock output
-            - `BLUETOOTH_CONNECT` / `BLUETOOTH_SCAN` — receiver pairing
-            - `FOREGROUND_SERVICE_LOCATION` — background GPS service
-            - `RECEIVE_BOOT_COMPLETED` — auto-start on device reboot
+            ### Permissions
+            - `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` — high-accuracy GPS location
+            - `BLUETOOTH_CONNECT` / `BLUETOOTH_SCAN` — GNSS receiver pairing
+            - `FOREGROUND_SERVICE_LOCATION` — keeps GPS running in background
+            - `RECEIVE_BOOT_COMPLETED` — auto-starts service on device reboot
+            - `WAKE_LOCK` — prevents CPU sleep during active session
 
             ---
             **Commit:** ${{ github.sha }}
