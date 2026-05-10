@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 // FIX #12: Removed unused imports: Spinner, ArrayAdapter, AdapterView, BluetoothAdapter,
 //          BluetoothDevice, BluetoothManager, View
@@ -33,11 +34,10 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQ_PERMISSIONS = 1;
 
     private TextView tvFix, tvSats, tvLat, tvLon, tvAlt, tvSpeed,
-                     tvBtStatus, tvBtDevice, tvLog;
+                     tvBtStatus, tvBtDevice, tvLog, tvSatelliteDetails;
     private Button btnToggle;
-    private LinearLayout logHeader;
-    private ImageView ivLogToggle;
-    private boolean isLogVisible = true;
+    private View homeView, satelliteView, terminalView;
+    private BottomNavigationView bottomNavigation;
 
     private GpsBluetoothService service;
     private boolean bound = false;
@@ -83,6 +83,9 @@ public class MainActivity extends AppCompatActivity {
                     tvLon.setText(String.format(java.util.Locale.US, "%.6f", lon));
                     tvAlt.setText(String.format(java.util.Locale.US, "%.1f", alt));
                     tvSpeed.setText(String.format(java.util.Locale.US, "%.1f", speed * 3.6f));
+                }
+                if (tvSatelliteDetails != null) {
+                    tvSatelliteDetails.setText("Sats In View: " + satsInView + "\nSats Used: " + satsUsed + "\nFix: " + (hasFix ? "Acquired" : "Pending"));
                 }
             });
         }
@@ -144,18 +147,32 @@ public class MainActivity extends AppCompatActivity {
         tvBtStatus = findViewById(R.id.tvBtStatus);
         tvBtDevice = findViewById(R.id.tvBtDevice);
         tvLog      = findViewById(R.id.tvLog);
+        tvSatelliteDetails = findViewById(R.id.tvSatelliteDetails);
         btnToggle  = findViewById(R.id.btnToggle);
-        logHeader  = findViewById(R.id.logHeader);
-        ivLogToggle = findViewById(R.id.ivLogToggle);
+        
+        homeView = findViewById(R.id.homeView);
+        satelliteView = findViewById(R.id.satelliteView);
+        terminalView = findViewById(R.id.terminalView);
+        bottomNavigation = findViewById(R.id.bottomNavigation);
 
         tvLog.setMovementMethod(new android.text.method.ScrollingMovementMethod());
 
-        logHeader.setOnClickListener(v -> {
-            isLogVisible = !isLogVisible;
-            tvLog.setVisibility(isLogVisible ? View.VISIBLE : View.GONE);
-            ivLogToggle.setImageResource(isLogVisible ? 
-                android.R.drawable.arrow_down_float : 
-                android.R.drawable.arrow_up_float);
+        bottomNavigation.setOnItemSelectedListener(item -> {
+            homeView.setVisibility(View.GONE);
+            satelliteView.setVisibility(View.GONE);
+            terminalView.setVisibility(View.GONE);
+            int id = item.getItemId();
+            if (id == R.id.nav_home) {
+                homeView.setVisibility(View.VISIBLE);
+                return true;
+            } else if (id == R.id.nav_satellite) {
+                satelliteView.setVisibility(View.VISIBLE);
+                return true;
+            } else if (id == R.id.nav_terminal) {
+                terminalView.setVisibility(View.VISIBLE);
+                return true;
+            }
+            return false;
         });
 
         btnToggle.setOnClickListener(v -> {
