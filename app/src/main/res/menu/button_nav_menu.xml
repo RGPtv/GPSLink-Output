@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_home"
+        android:icon="@android:drawable/ic_menu_mylocation"
+        android:title="Home" />
+    <item
+        android:id="@+id/nav_satellite"
+        android:icon="@android:drawable/ic_menu_compass"
+        android:title="GNSS Satellite" />
+    <item
+        android:id="@+id/nav_terminal"
+        android:icon="@android:drawable/ic_menu_info_details"
+        android:title="Terminal" />
+</menu>
