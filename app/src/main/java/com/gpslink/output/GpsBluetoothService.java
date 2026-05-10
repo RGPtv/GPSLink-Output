@@ -62,7 +62,18 @@ public class GpsBluetoothService extends Service {
     private int satsUsed   = 0;
     private int satsInView = 0;
     private boolean hasFix = false;
-    private volatile String lastSatDetails = "";
+    public static class SatInfo {
+        public String prn;
+        public String gnss;
+        public String snr;
+        public String elev;
+        public String azim;
+        public boolean isUsed;
+        public SatInfo(String prn, String gnss, String snr, String elev, String azim, boolean isUsed) {
+            this.prn = prn; this.gnss = gnss; this.snr = snr; this.elev = elev; this.azim = azim; this.isUsed = isUsed;
+        }
+    }
+    private volatile java.util.List<SatInfo> lastSatDetails = new java.util.ArrayList<>();
 
     // FIX #6: writeBuffer removed — was allocated but never used
 
@@ -72,7 +83,7 @@ public class GpsBluetoothService extends Service {
 
     public interface UiCallback {
         void onGpsUpdate(boolean hasFix, int satsUsed, int satsInView,
-                         double lat, double lon, double alt, float speed, String satDetails);
+                         double lat, double lon, double alt, float speed, java.util.List<SatInfo> satDetails);
         void onBluetoothStatus(String status, String deviceName, boolean connected);
         void onNmeaLog(String message);
         void onServiceStateChanged(boolean isRunning);
@@ -147,7 +158,7 @@ public class GpsBluetoothService extends Service {
         hasFix = false;
         satsUsed = 0;
         satsInView = 0;
-        lastSatDetails = "";
+        lastSatDetails = new java.util.ArrayList<>();
         stopGps();
 
         // Interrupt write thread first so it stops trying to write
@@ -174,7 +185,7 @@ public class GpsBluetoothService extends Service {
             UiCallback cb = uiCallback;
             if (cb != null) {
                 cb.onBluetoothStatus("Server Stopped", null, false);
-                cb.onGpsUpdate(false, 0, 0, 0, 0, 0, 0, "");
+                cb.onGpsUpdate(false, 0, 0, 0, 0, 0, 0, new java.util.ArrayList<>());
                 cb.onServiceStateChanged(false);
             }
         });
@@ -250,9 +261,7 @@ public class GpsBluetoothService extends Service {
         public void onSatelliteStatusChanged(@NonNull GnssStatus status) {
             int inView = status.getSatelliteCount();
             int used   = 0;
-            StringBuilder sb = new StringBuilder();
-            sb.append(String.format(java.util.Locale.US, "%-3s %-5s %-3s %-4s %-4s %s\n", "ID", "GNSS", "SNR", "ELEV", "AZIM", "ACTIVE"));
-            sb.append("---------------------------------\n");
+            java.util.List<SatInfo> list = new java.util.ArrayList<>();
             for (int i = 0; i < inView; i++) {
                 boolean isUsed = status.usedInFix(i);
                 if (isUsed) used++;
@@ -261,12 +270,11 @@ public class GpsBluetoothService extends Service {
                 String snr = String.format(java.util.Locale.US, "%.0f", status.getCn0DbHz(i));
                 String elev = String.format(java.util.Locale.US, "%.0f", status.getElevationDegrees(i));
                 String azim = String.format(java.util.Locale.US, "%.0f", status.getAzimuthDegrees(i));
-                String active = isUsed ? "✓" : "";
-                sb.append(String.format(java.util.Locale.US, "%-3s %-5s %-3s %-4s %-4s   %s\n", prn, gnss, snr, elev, azim, active));
+                list.add(new SatInfo(prn, gnss, snr, elev, azim, isUsed));
             }
             satsInView = inView;
             satsUsed   = used;
-            lastSatDetails = sb.toString().trim();
+            lastSatDetails = list;
             
             UiCallback cb = uiCallback;
             if (cb != null) {

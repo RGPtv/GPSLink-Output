@@ -34,7 +34,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQ_PERMISSIONS = 1;
 
     private TextView tvFix, tvSats, tvLat, tvLon, tvAlt, tvSpeed,
-                     tvBtStatus, tvBtDevice, tvLog, tvSatelliteDetails, tvSatelliteList;
+                     tvBtStatus, tvBtDevice, tvLog, tvSatelliteDetails;
+    private android.widget.TableLayout tableSatelliteList;
     private Button btnToggle;
     private View homeView, satelliteView, terminalView;
     private BottomNavigationView bottomNavigation;
@@ -72,7 +73,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onGpsUpdate(boolean hasFix, int satsUsed, int satsInView,
-                                double lat, double lon, double alt, float speed, String satDetails) {
+                                double lat, double lon, double alt, float speed, java.util.List<GpsBluetoothService.SatInfo> satDetails) {
             runOnUiThread(() -> {
                 tvFix.setText(hasFix ? "Fix" : "No Fix");
                 tvFix.setTextColor(ContextCompat.getColor(
@@ -87,11 +88,35 @@ public class MainActivity extends AppCompatActivity {
                 if (tvSatelliteDetails != null) {
                     tvSatelliteDetails.setText("Sats In View: " + satsInView + "\nSats Used: " + satsUsed + "\nFix: " + (hasFix ? "Acquired" : "Pending"));
                 }
-                if (tvSatelliteList != null) {
-                    tvSatelliteList.setText(satDetails);
+                if (tableSatelliteList != null) {
+                    tableSatelliteList.removeViews(1, Math.max(0, tableSatelliteList.getChildCount() - 1));
+                    for (GpsBluetoothService.SatInfo sat : satDetails) {
+                        android.widget.TableRow row = new android.widget.TableRow(MainActivity.this);
+                        row.setPadding(0, 8, 0, 8);
+                        
+                        row.addView(createTableCell(sat.prn));
+                        row.addView(createTableCell(sat.gnss));
+                        row.addView(createTableCell(sat.snr));
+                        row.addView(createTableCell(sat.elev));
+                        row.addView(createTableCell(sat.azim));
+                        row.addView(createTableCell(sat.isUsed ? "✓" : ""));
+                        
+                        tableSatelliteList.addView(row);
+                    }
                 }
             });
         }
+
+    private TextView createTableCell(String text) {
+        TextView tv = new TextView(MainActivity.this);
+        tv.setText(text);
+        tv.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.text_primary));
+        tv.setTextSize(11f);
+        tv.setPadding(4, 4, 4, 4);
+        tv.setGravity(android.view.Gravity.CENTER);
+        tv.setTypeface(android.graphics.Typeface.MONOSPACE);
+        return tv;
+    }
 
         @Override
         public void onBluetoothStatus(String status, String deviceName, boolean connected) {
@@ -151,7 +176,7 @@ public class MainActivity extends AppCompatActivity {
         tvBtDevice = findViewById(R.id.tvBtDevice);
         tvLog      = findViewById(R.id.tvLog);
         tvSatelliteDetails = findViewById(R.id.tvSatelliteDetails);
-        tvSatelliteList = findViewById(R.id.tvSatelliteList);
+        tableSatelliteList = findViewById(R.id.tableSatelliteList);
         btnToggle  = findViewById(R.id.btnToggle);
         
         homeView = findViewById(R.id.homeView);
