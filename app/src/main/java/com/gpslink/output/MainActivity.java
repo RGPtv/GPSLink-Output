@@ -47,6 +47,7 @@ public class MainActivity extends AppCompatActivity {
     // optimistically. Eliminated local boolean; all reads go through deriveRunning().
 
     private static final int MAX_LOGS = 20;
+    private static final int MAX_SAT_ROWS = 50;
     // FIX #9: Use StringBuilder kept across calls; append-only, trim at MAX_LOGS
     private final StringBuilder logBuilder = new StringBuilder();
     private int logLineCount = 0;
@@ -93,7 +94,7 @@ public class MainActivity extends AppCompatActivity {
                     int requiredRows = satDetails.size();
                     
                     // Add any missing rows needed
-                    while (currentRows < requiredRows) {
+                    while (currentRows < requiredRows && currentRows < MAX_SAT_ROWS) {
                         android.widget.TableRow row = new android.widget.TableRow(MainActivity.this);
                         row.setPadding(0, 8, 0, 8);
                         for (int i = 0; i < 6; i++) {
@@ -324,6 +325,10 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         if (bound && service != null) {
             service.setUiCallback(uiCallback);
+            // Replay buffered NMEA lines from background
+            for (String line : service.getRecentNmea()) {
+                uiCallback.onNmeaLog(line);
+            }
         }
         updateToggleButton();
     }

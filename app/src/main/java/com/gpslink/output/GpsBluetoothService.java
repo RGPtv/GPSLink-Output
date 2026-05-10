@@ -216,8 +216,13 @@ public class GpsBluetoothService extends Service {
     private volatile double lastLat = 0.0;
     private volatile double lastLon = 0.0;
     private volatile double lastAltitude = 0.0;
+    private volatile double lastEllipsoidAltitude = 0.0;
     private volatile float lastSpeed = 0.0f;
     private volatile float lastBearing = 0.0f;
+    private volatile boolean lastBearingValid = false;
+
+    private static final int NMEA_LOG_RING_SIZE = 30;
+    private final java.util.ArrayDeque<String> nmeaLogRing = new java.util.ArrayDeque<>(NMEA_LOG_RING_SIZE);
 
     private final LocationListener locationListener = new LocationListener() {
         @Override
@@ -225,6 +230,7 @@ public class GpsBluetoothService extends Service {
             hasFix = true;
             
             double alt = loc.getAltitude();
+            lastEllipsoidAltitude = loc.getAltitude();
             if (Build.VERSION.SDK_INT >= 34) { // Build.VERSION_CODES.UPSIDE_DOWN_CAKE
                 if (loc.hasMslAltitude()) {
                     alt = loc.getMslAltitudeMeters();
@@ -241,8 +247,10 @@ public class GpsBluetoothService extends Service {
             }
             if (loc.hasBearing()) {
                 lastBearing = loc.getBearing();
+                lastBearingValid = true;
             } else {
                 lastBearing = 0.0f;
+                lastBearingValid = false;
             }
 
             UiCallback cb = uiCallback;
@@ -332,12 +340,16 @@ public class GpsBluetoothService extends Service {
         }
 
         while (!writeQueue.offer(finalMessage)) writeQueue.poll(); // drop oldest on overflow
+        String trimmedForLog = finalMessage.trim();
+        synchronized (nmeaLogRing) {
+            if (nmeaLogRing.size() >= NMEA_LOG_RING_SIZE) nmeaLogRing.pollFirst();
+            nmeaLogRing.addLast(trimmedForLog);
+        }
         UiCallback cb = uiCallback;
         if (cb != null) {
-            String msgToLog = finalMessage;
             handler.post(() -> {
                 UiCallback inner = uiCallback;
-                if (inner != null) inner.onNmeaLog(msgToLog);
+                if (inner != null) inner.onNmeaLog(trimmedForLog);
             });
         }
     };
@@ -361,7 +373,8 @@ public class GpsBluetoothService extends Service {
             
             // Zero the geoid separation so the receiver doesn't miscalculate
             if (parts.length > 11) {
-                parts[11] = "0.0";
+                double geoidSep = lastEllipsoidAltitude - altitude;
+                parts[11] = String.format(java.util.Locale.US, "%.1f", geoidSep);
                 if (parts.length > 12 && parts[12].isEmpty()) parts[12] = "M";
             }
             
@@ -401,7 +414,7 @@ public class GpsBluetoothService extends Service {
             parts[7] = String.format(java.util.Locale.US, "%.1f", speedKnots);
             
             // Track angle / Course in degrees
-            parts[8] = String.format(java.util.Locale.US, "%.1f", bearing);
+            parts[8] = lastBearingValid ? String.format(java.util.Locale.US, "%.1f", bearing) : "";
             
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < parts.length; i++) {
@@ -431,8 +444,13 @@ public class GpsBluetoothService extends Service {
             String[] parts = core.split(",", -1);
             if (parts.length < 8) return message;
             
-            parts[1] = String.format(java.util.Locale.US, "%.1f", bearing);
-            if (parts.length > 2 && parts[2].isEmpty()) parts[2] = "T";
+            if (lastBearingValid) {
+                parts[1] = String.format(java.util.Locale.US, "%.1f", bearing);
+                if (parts.length > 2 && parts[2].isEmpty()) parts[2] = "T";
+            } else {
+                parts[1] = "";
+                if (parts.length > 2) parts[2] = "";
+            }
             
             double speedKnots = speedMps * 1.943844;
             parts[5] = String.format(java.util.Locale.US, "%.1f", speedKnots);
@@ -633,4 +651,10 @@ public class GpsBluetoothService extends Service {
 
     public void setUiCallback(UiCallback cb) { uiCallback = cb; }
     public boolean isRunning() { return running; }
+
+    public java.util.List<String> getRecentNmea() {
+        synchronized (nmeaLogRing) {
+            return new java.util.ArrayList<>(nmeaLogRing);
+        }
+    }
 }
