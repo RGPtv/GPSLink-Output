@@ -282,7 +282,8 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (requestCode == REQ_PERMISSIONS) {
             boolean locationGranted = false;
-            boolean btGranted = false;
+            // On API < 31, BT permissions are normal (auto-granted) and won't appear in results
+            boolean btGranted = Build.VERSION.SDK_INT < 31;
             for (int i = 0; i < permissions.length; i++) {
                 if (Manifest.permission.ACCESS_FINE_LOCATION.equals(permissions[i]))
                     locationGranted = results[i] == PackageManager.PERMISSION_GRANTED;
