@@ -26,15 +26,14 @@ import java.util.ArrayList;
 import java.util.List;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
-// FIX #12: Removed unused imports: Spinner, ArrayAdapter, AdapterView, BluetoothAdapter,
-//          BluetoothDevice, BluetoothManager, View
+
 
 public class MainActivity extends AppCompatActivity {
 
     private static final int REQ_PERMISSIONS = 1;
 
     private TextView tvFix, tvSats, tvLat, tvLon, tvAlt, tvSpeed,
-                     tvBtStatus, tvBtDevice, tvLog, tvSatelliteDetails;
+            tvBtStatus, tvBtDevice, tvLog, tvSatelliteDetails;
     private android.widget.TableLayout tableSatelliteList;
     private Button btnToggle;
     private View homeView, satelliteView, terminalView;
@@ -43,12 +42,9 @@ public class MainActivity extends AppCompatActivity {
     private GpsBluetoothService service;
     private boolean bound = false;
 
-    // FIX #11: 'running' is now derived exclusively from the service, not set
-    // optimistically. Eliminated local boolean; all reads go through deriveRunning().
-
     private static final int MAX_LOGS = 20;
     private static final int MAX_SAT_ROWS = 50;
-    // FIX #9: Use StringBuilder kept across calls; append-only, trim at MAX_LOGS
+    private static final int TABLE_HEADER_ROW_COUNT = 1;
     private final StringBuilder logBuilder = new StringBuilder();
     private int logLineCount = 0;
 
@@ -69,12 +65,12 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    private final GpsBluetoothService.UiCallback uiCallback =
-            new GpsBluetoothService.UiCallback() {
+    private final GpsBluetoothService.UiCallback uiCallback = new GpsBluetoothService.UiCallback() {
 
         @Override
         public void onGpsUpdate(boolean hasFix, int satsUsed, int satsInView,
-                                double lat, double lon, double alt, float speed, java.util.List<GpsBluetoothService.SatInfo> satDetails) {
+                double lat, double lon, double alt, float speed,
+                java.util.List<GpsBluetoothService.SatInfo> satDetails) {
             runOnUiThread(() -> {
                 tvFix.setText(hasFix ? "Fix" : "No Fix");
                 tvFix.setTextColor(ContextCompat.getColor(
@@ -85,14 +81,20 @@ public class MainActivity extends AppCompatActivity {
                     tvLon.setText(String.format(java.util.Locale.US, "%.6f", lon));
                     tvAlt.setText(String.format(java.util.Locale.US, "%.1f", alt));
                     tvSpeed.setText(String.format(java.util.Locale.US, "%.1f", speed * 3.6f));
+                } else {
+                    tvLat.setText("—");
+                    tvLon.setText("—");
+                    tvAlt.setText("—");
+                    tvSpeed.setText("—");
                 }
                 if (tvSatelliteDetails != null) {
-                    tvSatelliteDetails.setText("Sats In View: " + satsInView + "\nSats Used: " + satsUsed + "\nFix: " + (hasFix ? "Acquired" : "Pending"));
+                    tvSatelliteDetails.setText("Sats In View: " + satsInView + "\nSats Used: " + satsUsed + "\nFix: "
+                            + (hasFix ? "Acquired" : "Pending"));
                 }
                 if (tableSatelliteList != null) {
-                    int currentRows = tableSatelliteList.getChildCount() - 1;
+                    int currentRows = tableSatelliteList.getChildCount() - TABLE_HEADER_ROW_COUNT;
                     int requiredRows = satDetails.size();
-                    
+
                     // Add any missing rows needed
                     while (currentRows < requiredRows && currentRows < MAX_SAT_ROWS) {
                         android.widget.TableRow row = new android.widget.TableRow(MainActivity.this);
@@ -103,10 +105,10 @@ public class MainActivity extends AppCompatActivity {
                         tableSatelliteList.addView(row);
                         currentRows++;
                     }
-                    
+
                     // Update rows and hide excess ones
                     for (int i = 0; i < currentRows; i++) {
-                        android.widget.TableRow row = (android.widget.TableRow) tableSatelliteList.getChildAt(i + 1);
+                        android.widget.TableRow row = (android.widget.TableRow) tableSatelliteList.getChildAt(i + TABLE_HEADER_ROW_COUNT);
                         if (i < requiredRows) {
                             row.setVisibility(android.view.View.VISIBLE);
                             GpsBluetoothService.SatInfo sat = satDetails.get(i);
@@ -124,16 +126,16 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-    private TextView createTableCell(String text) {
-        TextView tv = new TextView(MainActivity.this);
-        tv.setText(text);
-        tv.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.text_primary));
-        tv.setTextSize(11f);
-        tv.setPadding(4, 4, 4, 4);
-        tv.setGravity(android.view.Gravity.CENTER);
-        tv.setTypeface(android.graphics.Typeface.MONOSPACE);
-        return tv;
-    }
+        private TextView createTableCell(String text) {
+            TextView tv = new TextView(MainActivity.this);
+            tv.setText(text);
+            tv.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.text_primary));
+            tv.setTextSize(11f);
+            tv.setPadding(4, 4, 4, 4);
+            tv.setGravity(android.view.Gravity.CENTER);
+            tv.setTypeface(android.graphics.Typeface.MONOSPACE);
+            return tv;
+        }
 
         @Override
         public void onBluetoothStatus(String status, String deviceName, boolean connected) {
@@ -148,20 +150,27 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onNmeaLog(String message) {
             runOnUiThread(() -> {
-                // FIX #9: O(1) append instead of O(n) full rebuild on every message
                 String trimmed = message.trim();
                 if (logLineCount >= MAX_LOGS) {
                     // Remove the first line
                     int nl = logBuilder.indexOf("\n");
-                    if (nl >= 0) logBuilder.delete(0, nl + 1);
-                    else logBuilder.setLength(0);
+                    if (nl >= 0)
+                        logBuilder.delete(0, nl + 1);
+                    else
+                        logBuilder.setLength(0);
                     logLineCount--;
                 }
-                if (logBuilder.length() > 0) logBuilder.append('\n');
+                if (logBuilder.length() > 0)
+                    logBuilder.append('\n');
                 logBuilder.append(trimmed);
                 logLineCount++;
                 tvLog.setText(logBuilder.toString());
             });
+        }
+
+        @Override
+        public void onDroppedMessages(int count) {
+            // Optional: log or display dropped message count
         }
 
         @Override
@@ -170,7 +179,7 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    // FIX #11: react to service stop via broadcast; derive state from service, not local flag
+    // React to service stop via broadcast
     private final BroadcastReceiver serviceStopReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -183,25 +192,23 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        tvFix      = findViewById(R.id.tvFix);
-        tvSats     = findViewById(R.id.tvSats);
-        tvLat      = findViewById(R.id.tvLat);
-        tvLon      = findViewById(R.id.tvLon);
-        tvAlt      = findViewById(R.id.tvAlt);
-        tvSpeed    = findViewById(R.id.tvSpeed);
+        tvFix = findViewById(R.id.tvFix);
+        tvSats = findViewById(R.id.tvSats);
+        tvLat = findViewById(R.id.tvLat);
+        tvLon = findViewById(R.id.tvLon);
+        tvAlt = findViewById(R.id.tvAlt);
+        tvSpeed = findViewById(R.id.tvSpeed);
         tvBtStatus = findViewById(R.id.tvBtStatus);
         tvBtDevice = findViewById(R.id.tvBtDevice);
-        tvLog      = findViewById(R.id.tvLog);
+        tvLog = findViewById(R.id.tvLog);
         tvSatelliteDetails = findViewById(R.id.tvSatelliteDetails);
         tableSatelliteList = findViewById(R.id.tableSatelliteList);
-        btnToggle  = findViewById(R.id.btnToggle);
-        
+        btnToggle = findViewById(R.id.btnToggle);
+
         homeView = findViewById(R.id.homeView);
         satelliteView = findViewById(R.id.satelliteView);
         terminalView = findViewById(R.id.terminalView);
         bottomNavigation = findViewById(R.id.bottomNavigation);
-
-        tvLog.setMovementMethod(new android.text.method.ScrollingMovementMethod());
 
         bottomNavigation.setOnItemSelectedListener(item -> {
             homeView.setVisibility(View.GONE);
@@ -222,8 +229,10 @@ public class MainActivity extends AppCompatActivity {
         });
 
         btnToggle.setOnClickListener(v -> {
-            if (!deriveRunning()) startServiceAction();
-            else stopServiceAction();
+            if (!deriveRunning())
+                startServiceAction();
+            else
+                stopServiceAction();
         });
 
         ContextCompat.registerReceiver(this, serviceStopReceiver,
@@ -239,18 +248,19 @@ public class MainActivity extends AppCompatActivity {
 
     private void checkPermissions() {
         String[] perms = Build.VERSION.SDK_INT >= 31
-                ? new String[]{
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.BLUETOOTH_CONNECT,
-                    Manifest.permission.BLUETOOTH_SCAN}
-                : new String[]{
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.BLUETOOTH,
-                    Manifest.permission.BLUETOOTH_ADMIN};
+                ? new String[] {
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.BLUETOOTH_CONNECT,
+                        Manifest.permission.BLUETOOTH_SCAN }
+                : new String[] {
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.BLUETOOTH,
+                        Manifest.permission.BLUETOOTH_ADMIN };
 
         List<String> needed = new ArrayList<>();
         for (String p : perms) {
-            if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) needed.add(p);
+            if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED)
+                needed.add(p);
         }
 
         if (!needed.isEmpty()) {
@@ -263,7 +273,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onRequestPermissionsResult(int requestCode,
-                                           String[] permissions, int[] results) {
+            String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (requestCode == REQ_PERMISSIONS) {
             for (int r : results) {
@@ -276,7 +286,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void onPermissionsGranted() { bindToService(); }
+    private void onPermissionsGranted() {
+        bindToService();
+    }
 
     // -------------------------------------------------------------------------
     // Service binding
@@ -289,8 +301,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void startServiceAction() {
         startForegroundService(new Intent(this, GpsBluetoothService.class));
-        if (!bound) bindToService();
-        updateToggleButton();
+        if (!bound)
+            bindToService();
     }
 
     private void stopServiceAction() {
@@ -304,7 +316,7 @@ public class MainActivity extends AppCompatActivity {
     // UI state
     // -------------------------------------------------------------------------
 
-    // FIX #11: single source of truth — always read from service when bound
+    // Single source of truth — always read from service when bound
     private boolean deriveRunning() {
         return bound && service != null && service.isRunning();
     }
@@ -325,6 +337,8 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         if (bound && service != null) {
             service.setUiCallback(uiCallback);
+            logBuilder.setLength(0);
+            logLineCount = 0;
             // Replay buffered NMEA lines from background
             for (String line : service.getRecentNmea()) {
                 uiCallback.onNmeaLog(line);
@@ -336,7 +350,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        if (bound && service != null) service.setUiCallback(null);
+        if (bound && service != null)
+            service.setUiCallback(null);
     }
 
     @Override

@@ -436,9 +436,7 @@
                     android:paddingHorizontal="16dp"
                     android:paddingVertical="10dp"
                     android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:clickable="true"
-                    android:focusable="true">
+                    android:gravity="center_vertical">
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -449,18 +447,21 @@
                         android:textStyle="bold"
                         android:letterSpacing="0.1" />
                 </LinearLayout>
-                <TextView
-                    android:id="@+id/tvLog"
+                <ScrollView
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:background="#050608"
-                    android:textColor="@color/green"
-                    android:textSize="9.5sp"
-                    android:fontFamily="monospace"
-                    android:padding="12dp"
-                    android:lineSpacingExtra="2dp"
-                    android:scrollbars="vertical"
-                    android:text="System Initialized.\nWaiting for NMEA stream..." />
+                    android:background="#050608">
+                    <TextView
+                        android:id="@+id/tvLog"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/green"
+                        android:textSize="9.5sp"
+                        android:fontFamily="monospace"
+                        android:padding="12dp"
+                        android:lineSpacingExtra="2dp"
+                        android:text="System Initialized.\nWaiting for NMEA stream..." />
+                </ScrollView>
             </LinearLayout>
         </LinearLayout>
     </FrameLayout>
