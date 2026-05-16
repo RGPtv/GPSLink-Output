@@ -23,7 +23,8 @@ public class BootReceiver extends BroadcastReceiver {
             return;
 
         String addr = Prefs.getLastDevice(context);
-        if (addr != null) {
+        // [B6] Guard against both null and empty saved address
+        if (addr != null && !addr.isEmpty()) {
             Intent svc = new Intent(context, GpsBluetoothService.class);
             context.startForegroundService(svc);
         }

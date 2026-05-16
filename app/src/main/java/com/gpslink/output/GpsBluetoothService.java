@@ -179,12 +179,17 @@ public class GpsBluetoothService extends Service {
         hasFix = false;
         satsUsed = 0;
         satsInView = 0;
+        droppedMessages = 0; // [M4] Reset counter on service stop
         lastSatDetails = new java.util.ArrayList<>();
         stopGps();
 
         // Interrupt write thread first so it stops trying to write
         if (writeThread != null) {
             writeThread.interrupt();
+            // [P4] Wait for write thread to finish before nulling
+            try { writeThread.join(2000); } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
             writeThread = null;
         }
 
@@ -635,9 +640,10 @@ public class GpsBluetoothService extends Service {
         }, "BT-Server").start();
     }
 
+    // [P1] Iterative accept loop — avoids StackOverflowError from recursive calls
     private void acceptLoop(BluetoothServerSocket localServer) {
-        try {
-            while (running) {
+        while (running) {
+            try {
                 if (btSocket == null) {
                     handler.post(() -> notifyBtStatus("Waiting for connection...", false));
                 }
@@ -659,10 +665,11 @@ public class GpsBluetoothService extends Service {
                     updateNotification("Connected: " + name);
                     notifyBtStatusConnected(name);
                 });
+            } catch (IOException e) {
+                if (running)
+                    handler.post(() -> notifyBtStatus("Server stopped", false));
+                break; // Exit the loop on error
             }
-        } catch (IOException e) {
-            if (running)
-                handler.post(() -> notifyBtStatus("Server stopped", false));
         }
     }
 
@@ -762,7 +769,8 @@ public class GpsBluetoothService extends Service {
 
     private void updateNotification(String text) {
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        nm.notify(NOTIF_ID, buildNotification(text));
+        // [B5] Null-guard to prevent NPE on some devices
+        if (nm != null) nm.notify(NOTIF_ID, buildNotification(text));
     }
 
     private Notification buildNotification(String text) {
