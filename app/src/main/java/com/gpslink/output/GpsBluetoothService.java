@@ -40,7 +40,8 @@ public class GpsBluetoothService extends Service {
     public static final String ACTION_STOPPED = "com.gpslink.output.STOPPED";
     public static final String ACTION_BT_ERROR = "com.gpslink.output.BT_ERROR";
 
-    private static final String CHANNEL_ID = "gpslink_channel";
+    private static final String CHANNEL_ID = "gpslink_fg_channel";
+    private static final String OLD_CHANNEL_ID = "gpslink_channel";
     private static final int NOTIF_ID = 1;
     private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
@@ -86,8 +87,6 @@ public class GpsBluetoothService extends Service {
     }
 
     private volatile java.util.List<SatInfo> lastSatDetails = new java.util.ArrayList<>();
-
-
 
     // -------------------------------------------------------------------------
     // Interface
@@ -403,7 +402,11 @@ public class GpsBluetoothService extends Service {
             UiCallback dcb = uiCallback;
             if (dcb != null) {
                 int count = droppedMessages;
-                handler.post(() -> { UiCallback ic = uiCallback; if (ic != null) ic.onDroppedMessages(count); });
+                handler.post(() -> {
+                    UiCallback ic = uiCallback;
+                    if (ic != null)
+                        ic.onDroppedMessages(count);
+                });
             }
         }
         String trimmedForLog = finalMessage.trim();
@@ -425,7 +428,8 @@ public class GpsBluetoothService extends Service {
     private String joinAndChecksum(String[] parts) {
         String joined = String.join(",", parts);
         int xor = 0;
-        for (char c : joined.toCharArray()) xor ^= c;
+        for (char c : joined.toCharArray())
+            xor ^= c;
         return "$" + joined + "*" + String.format(java.util.Locale.US, "%02X", xor);
     }
 
@@ -587,7 +591,8 @@ public class GpsBluetoothService extends Service {
                     });
                 }
             } catch (IOException e) {
-                if (!running) return;
+                if (!running)
+                    return;
                 // Exponential back-off retry (max 5 attempts)
                 int maxRetries = 5;
                 for (int attempt = 0; attempt < maxRetries && running; attempt++) {
@@ -599,7 +604,8 @@ public class GpsBluetoothService extends Service {
                     } catch (InterruptedException ie) {
                         break;
                     }
-                    if (!running) break;
+                    if (!running)
+                        break;
                     try {
                         closeSilently(serverSocket);
                         localServer = btAdapter.listenUsingRfcommWithServiceRecord(
@@ -780,12 +786,15 @@ public class GpsBluetoothService extends Service {
     }
 
     private void createNotificationChannel() {
+        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        // Delete the old low-importance channel if it exists (cached by OS)
+        nm.deleteNotificationChannel(OLD_CHANNEL_ID);
+
         NotificationChannel ch = new NotificationChannel(
-                CHANNEL_ID, "GPS Streaming", NotificationManager.IMPORTANCE_DEFAULT);
-        ch.setDescription("GPS NMEA streaming over Bluetooth");
+                CHANNEL_ID, "GPSLink Server", NotificationManager.IMPORTANCE_DEFAULT);
+        ch.setDescription("GPS server is running");
         ch.setShowBadge(true);
-        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE))
-                .createNotificationChannel(ch);
+        nm.createNotificationChannel(ch);
     }
 
     public void setUiCallback(UiCallback cb) {
