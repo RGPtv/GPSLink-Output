@@ -247,15 +247,22 @@ public class MainActivity extends AppCompatActivity {
     // -------------------------------------------------------------------------
 
     private void checkPermissions() {
-        String[] perms = Build.VERSION.SDK_INT >= 31
-                ? new String[] {
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.BLUETOOTH_CONNECT,
-                        Manifest.permission.BLUETOOTH_SCAN }
-                : new String[] {
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.BLUETOOTH,
-                        Manifest.permission.BLUETOOTH_ADMIN };
+        List<String> permList = new ArrayList<>();
+        permList.add(Manifest.permission.ACCESS_FINE_LOCATION);
+
+        if (Build.VERSION.SDK_INT >= 31) {
+            permList.add(Manifest.permission.BLUETOOTH_CONNECT);
+            permList.add(Manifest.permission.BLUETOOTH_SCAN);
+        } else {
+            permList.add(Manifest.permission.BLUETOOTH);
+            permList.add(Manifest.permission.BLUETOOTH_ADMIN);
+        }
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            permList.add(Manifest.permission.POST_NOTIFICATIONS);
+        }
+
+        String[] perms = permList.toArray(new String[0]);
 
         List<String> needed = new ArrayList<>();
         for (String p : perms) {
