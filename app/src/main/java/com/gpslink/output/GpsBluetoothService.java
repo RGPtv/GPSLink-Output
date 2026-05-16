@@ -197,9 +197,12 @@ public class GpsBluetoothService extends Service {
         if (wakeLock != null && wakeLock.isHeld())
             wakeLock.release();
 
-        stopForeground(true);
+        if (Build.VERSION.SDK_INT >= 24) {
+            stopForeground(STOP_FOREGROUND_REMOVE);
+        } else {
+            stopForeground(true);
+        }
 
-        handler.removeCallbacksAndMessages(null);
         handler.post(() -> {
             UiCallback cb = uiCallback;
             if (cb != null) {

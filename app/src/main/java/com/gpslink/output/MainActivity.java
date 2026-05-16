@@ -12,8 +12,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.widget.Button;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.view.View;
@@ -283,11 +281,19 @@ public class MainActivity extends AppCompatActivity {
             String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (requestCode == REQ_PERMISSIONS) {
-            for (int r : results) {
-                if (r != PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(this, "Permissions required", Toast.LENGTH_LONG).show();
-                    return;
-                }
+            boolean locationGranted = false;
+            boolean btGranted = false;
+            for (int i = 0; i < permissions.length; i++) {
+                if (Manifest.permission.ACCESS_FINE_LOCATION.equals(permissions[i]))
+                    locationGranted = results[i] == PackageManager.PERMISSION_GRANTED;
+                else if (Manifest.permission.BLUETOOTH_CONNECT.equals(permissions[i])
+                        || Manifest.permission.BLUETOOTH.equals(permissions[i]))
+                    btGranted = results[i] == PackageManager.PERMISSION_GRANTED;
+            }
+            // Location and Bluetooth are mandatory; notification is optional
+            if (!locationGranted || !btGranted) {
+                Toast.makeText(this, "Location and Bluetooth permissions required", Toast.LENGTH_LONG).show();
+                return;
             }
             onPermissionsGranted();
         }
@@ -316,7 +322,6 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(this, GpsBluetoothService.class);
         intent.setAction(GpsBluetoothService.ACTION_STOP);
         startService(intent);
-        updateToggleButton();
     }
 
     // -------------------------------------------------------------------------
